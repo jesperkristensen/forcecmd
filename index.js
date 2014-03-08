@@ -1,9 +1,8 @@
 var jsforce = require("jsforce");
 var fs = require("fs");
 var Promise = require("jsforce/lib/promise");
-var stream = require("stream"),
-    Stream = stream.Stream;
 var q = require("q");
+var JSZip = require("jszip");
 
 function asArray(x) {
   if (!x) return [];
@@ -12,6 +11,22 @@ function asArray(x) {
 }
 function flattenArray(x) {
   return [].concat.apply([], x);
+}
+
+function writeFile(path, data) {
+  var p = new Promise();
+  var pos = -1;
+  while (true) {
+    pos = path.indexOf("/", pos + 1);
+    if (pos == -1) {
+      break;
+    }
+    (function() {
+      var dir = path.substring(0, pos);
+      p = p.then(function() { return q.nfcall(fs.mkdir, dir); }).then(null, function(err) { if (err.code != "EEXIST") throw err; });
+    })();
+  }
+  return p.then(function() { return q.nfcall(fs.writeFile, path, data); });
 }
 
 var conn;
@@ -86,12 +101,17 @@ q.nfcall(fs.readFile, "forcecmd.json", "utf-8")
       .retrieve({apiVersion: "28.0", unpackaged: {types: types, version: "28.0"}})
       .complete();
   })
-  .then(function(result) {
-    var rstream = new Stream();
-    rstream.readable = true;
-    rstream.pipe(fs.createWriteStream("./MyPackage.zip"));
-    rstream.emit("data", new Buffer(result.zipFile, "base64"));
-    rstream.emit("end");
-    return result.messages;
+  .then(function(res) {
+    var zip = new JSZip(res.zipFile, {base64: true});
+    var files = [];
+    for (var p in zip.files) {
+      var file = zip.files[p];
+      if (!file.options.dir) {
+        var name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
+        files.push(writeFile(name, file.asNodeBuffer()));
+      }
+    }
+    console.log(res.messages);
+    return Promise.all(files);
   })
-  .then(function(res) { console.log(res); }, function(err) { console.error(err); });
+  .then(null, function(err) { console.error(err); });
