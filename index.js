@@ -30,16 +30,26 @@ function writeFile(path, data) {
 }
 
 var conn;
-q.nfcall(fs.readFile, "forcecmd.json", "utf-8")
-  .then(function(file) {
+Promise
+  .all([
+    q.nfcall(fs.readFile, "forcecmd.json", "utf-8"),
+    q.nfcall(fs.readFile, (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json", "utf-8")
+  ])
+  .then(function(files) {
+    var file = files[0];
+    var pwfile = files[1];
     var config = JSON.parse(file);
+    var password = JSON.parse(pwfile).passwords[config.loginUrl + "$" + config.username];
+    if (!config.loginUrl) throw "Missing loginUrl";
+    if (!config.username) throw "Missing username";
+    if (!password) throw "Missing password";
     conn = new jsforce.Connection({loginUrl: config.loginUrl, version: "28.0"});
     console.log("Login");
-    return conn.login(config.username, config.password);
+    return conn.login(config.username, password);
   })
   .then(function() {
     console.log("Describe");
-    return conn.metadata.describe("28.0")
+    return conn.metadata.describe("28.0");
   })
   .then(function(res) {
     // TODO: Batch list calls into groups of three
@@ -102,8 +112,8 @@ q.nfcall(fs.readFile, "forcecmd.json", "utf-8")
       .complete();
   })
   .then(function(res) {
-    var zip = new JSZip(res.zipFile, {base64: true});
     var files = [];
+    var zip = new JSZip(res.zipFile, {base64: true});
     for (var p in zip.files) {
       var file = zip.files[p];
       if (!file.options.dir) {
@@ -111,6 +121,7 @@ q.nfcall(fs.readFile, "forcecmd.json", "utf-8")
         files.push(writeFile(name, file.asNodeBuffer()));
       }
     }
+    console.log("Done");
     console.log(res.messages);
     return Promise.all(files);
   })
