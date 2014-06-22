@@ -90,7 +90,7 @@ common.login()
       .filter(function(x) { return x.length > 0})
       .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return y.fullName; })}; });
     //console.log(types);
-    conn.metadata.pollTimeout = 100000;
+    conn.metadata.pollTimeout = 10*60*1000;
     console.log("Retrieve");
     return conn.metadata
       .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
