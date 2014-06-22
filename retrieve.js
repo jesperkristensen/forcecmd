@@ -34,7 +34,7 @@ common.login()
   .then(function(c) {
     conn = c;
     console.log("Describe");
-    return conn.metadata.describe("28.0");
+    return conn.metadata.describe(common.apiVersion);
   })
   .then(function(res) {
     // TODO: Batch list calls into groups of three
@@ -93,7 +93,7 @@ common.login()
     conn.metadata.pollTimeout = 100000;
     console.log("Retrieve");
     return conn.metadata
-      .retrieve({apiVersion: "28.0", unpackaged: {types: types, version: "28.0"}})
+      .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
       .complete();
   })
   .then(function(res) {

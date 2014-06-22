@@ -12,11 +12,13 @@ module.exports.login = function() {
       var file = files[0];
       var pwfile = files[1];
       var config = JSON.parse(file);
+      module.exports.apiVersion = config.apiVersion;
       var password = JSON.parse(pwfile).passwords[config.loginUrl + "$" + config.username];
       if (!config.loginUrl) throw "Missing loginUrl";
       if (!config.username) throw "Missing username";
       if (!password) throw "Missing password";
-      var conn = new jsforce.Connection({loginUrl: config.loginUrl, version: "28.0"});
+      if (!config.apiVersion) throw "Missing apiVersion";
+      var conn = new jsforce.Connection({loginUrl: config.loginUrl, version: module.exports.apiVersion});
       console.log("Login");
       return conn.login(config.username, password).then(function() { return conn; });
     });
