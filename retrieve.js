@@ -1,4 +1,4 @@
-var fs = require("fs");
+var fs = require("graceful-fs");
 var Promise = require("jsforce/lib/promise");
 var q = require("q");
 var JSZip = require("jszip");
@@ -107,8 +107,8 @@ common.login()
         files.push(writeFile(name, file.asNodeBuffer()));
       }
     }
-    console.log("Done");
     console.log(res.messages);
+    console.log("Writing files");
     return Promise.all(files);
   })
   .then(null, function(err) { console.error(err); });

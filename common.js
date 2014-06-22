@@ -1,5 +1,5 @@
 var jsforce = require("jsforce");
-var fs = require("fs");
+var fs = require("graceful-fs");
 var Promise = require("jsforce/lib/promise");
 var q = require("q");
 module.exports.login = function() {

@@ -5,6 +5,7 @@
   "dependencies": {
     "q": "0.9.x",
     "jszip": "2.2.x",
+    "graceful-fs": "3.0.2",
     "jsforce": "^1.1.0"
   }
 }
