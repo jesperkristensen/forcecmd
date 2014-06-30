@@ -13,6 +13,7 @@ module.exports.login = function() {
       var pwfile = files[1];
       var config = JSON.parse(file);
       module.exports.apiVersion = config.apiVersion;
+      module.exports.excludeDirs = config.excludeDirs || [];
       var password = JSON.parse(pwfile).passwords[config.loginUrl + "$" + config.username];
       if (!config.loginUrl) throw "Missing loginUrl";
       if (!config.username) throw "Missing username";

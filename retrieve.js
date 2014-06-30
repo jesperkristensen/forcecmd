@@ -44,6 +44,10 @@ common.login()
         var xmlNames = metadataObject.childXmlNames ? metadataObject.childXmlNames.concat(metadataObject.xmlName) : [metadataObject.xmlName];
         // TODO: should we avoid hardcoding the excluded component types?
         xmlNames = xmlNames.filter(function(xmlName) { return typeof xmlName == "string" && ["ApexTriggerCoupling", "WorkflowActionFlow"].indexOf(xmlName) == -1; });
+        if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
+          console.log("Excluding " + metadataObject.directoryName);
+          return [];
+        }
         if (metadataObject.inFolder) {
           var folderType = metadataObject.xmlName == "EmailTemplate" ? "EmailFolder" : metadataObject.xmlName + "Folder";
           console.log("List " + folderType);
