@@ -29,6 +29,27 @@ function writeFile(path, data) {
   return p.then(function() { return q.nfcall(fs.writeFile, path, data); });
 }
 
+function complete(self) {
+  var deferred = Promise.defer();
+  var interval = 1000;
+  var poll = function() {
+    console.log("Check");
+    self.check().then(function(results) {
+      var done = results && asArray(results).every(function(result) { return result.done; });
+      if (done) {
+        deferred.resolve(results);
+      } else {
+        interval *= 1.3;
+        setTimeout(poll, interval);
+      }
+    }, function(err) {
+      deferred.reject(err);
+    });
+  };
+  setTimeout(poll, interval);
+  return deferred.promise;
+}
+
 var conn;
 common.login()
   .then(function(c) {
@@ -94,13 +115,18 @@ common.login()
       .filter(function(x) { return x.length > 0})
       .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return y.fullName; })}; });
     //console.log(types);
-    conn.metadata.pollTimeout = 10*60*1000;
     console.log("Retrieve");
-    return conn.metadata
-      .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
-      .complete();
+    return complete(
+      conn.metadata
+        .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
+    );
+  })
+  .then(function(result) {
+    console.log("CheckRetrieveStatus");
+    return conn.metadata.checkRetrieveStatus(result.id);
   })
   .then(function(res) {
+    console.log("Reading response");
     var files = [];
     files.push(writeFile("status.json", JSON.stringify({fileProperties: res.fileProperties, messages: res.messages})));
     var zip = new JSZip(res.zipFile, {base64: true});
