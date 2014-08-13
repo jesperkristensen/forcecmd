@@ -6,7 +6,6 @@ var xmldom = require("xmldom");
 var common = require("./common");
 
 var fileNames = process.argv.slice(2);
-// TOOD deployment of "folders"
 
 function readAllFiles(fileNames) {
   return Promise
@@ -31,8 +30,12 @@ var filesPromise = function(){
     if (fileName.indexOf("src/") != 0) {
       throw "Not a source file: " + fileName;
     }
-    readFiles.push(fileName);
-    readFiles.push(fileName + "-meta.xml");
+    if (fileName.substr(-1) == "/") {
+      readFiles.push(fileName.substring(0, fileName.length - 1) + "-meta.xml");
+    } else {
+      readFiles.push(fileName);
+      readFiles.push(fileName + "-meta.xml");
+    }
   });
 
   return readAllFiles(readFiles)
@@ -79,16 +82,27 @@ Promise
       return e;
     }
     fileNames.forEach(function(fileName) {
-      if (files[fileName] == null) {
-        throw "File not found: " + fileName;
-      }
-      var zipFileName = "unpackaged/" + fileName.substring("src/".length);
-      zip.file(zipFileName, files[fileName]);
-      if (files[fileName + "-meta.xml"] != null) {
-        zip.file(zipFileName + "-meta.xml",  files[fileName + "-meta.xml"]);
-      }
+      if (fileName.substr(-1) == "/") { // It is a "Folder". It does not have a main metadata file, only the -meta.xml file.
+        var folderMetaName = fileName.substring(0, fileName.length - 1) + "-meta.xml"
+        if (files[folderMetaName] == null) {
+          throw "File not found: " + fileName;
+        }
+        var zipFileName = "unpackaged/" + folderMetaName.substring("src/".length);
+        zip.file(zipFileName, files[folderMetaName]);
 
-      var fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.lastIndexOf("."));
+        var fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.length - "-meta.xml".length);
+      } else {
+        if (files[fileName] == null) {
+          throw "File not found: " + fileName;
+        }
+        var zipFileName = "unpackaged/" + fileName.substring("src/".length);
+        zip.file(zipFileName, files[fileName]);
+        if (files[fileName + "-meta.xml"] != null) {
+          zip.file(zipFileName + "-meta.xml",  files[fileName + "-meta.xml"]);
+        }
+
+        var fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.lastIndexOf("."));
+      }
       var typeDirName = zipFileName.substring("unpackaged/".length, zipFileName.indexOf("/", "unpackaged/".length));
 
       if (!(typeDirName in metadataObjectsByDir)) {
