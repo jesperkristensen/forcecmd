@@ -7,9 +7,13 @@ var common = require("./common");
 
 var fileNames = [];
 var destroy = false;
+var deployOptions = {};
 process.argv.slice(2).forEach(function(arg) {
   if (arg == "--destroy") {
     destroy = true;
+  } else if (arg.indexOf("--options=") > -1) {
+    // See http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
+    deployOptions = JSON.parse(arg.substring("--options=".length));
   } else if (arg[0] == "-") {
     throw "Unknown argument: " + arg;
   } else {
@@ -143,7 +147,7 @@ Promise
   .then(function(zipFile) {
     conn.metadata.pollTimeout = 100000;
     console.log("Deploy");
-    var p = common.complete(conn.metadata.deploy(new Buffer(zipFile, "base64")));
+    var p = common.complete(conn.metadata.deploy(new Buffer(zipFile, "base64"), deployOptions));
     return p;
   })
   .then(function(result) {
