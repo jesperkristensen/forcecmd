@@ -104,7 +104,14 @@ common.login()
   .then(function(res) {
     console.log("Reading response");
     var files = [];
-    files.push(writeFile("status.json", JSON.stringify({fileProperties: res.fileProperties, messages: res.messages}, null, "    ")));
+
+    files.push(writeFile("status.json", JSON.stringify({
+      fileProperties: asArray(res.fileProperties)
+        .filter(function(fp) { return fp.id != "000000000000000AAA" || fp.fullName != ""; })
+        .sort(function(fp1, fp2) { return fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0 }),
+      messages: res.messages
+    }, null, "    ")));
+
     var zip = new JSZip(res.zipFile, {base64: true});
     for (var p in zip.files) {
       var file = zip.files[p];
