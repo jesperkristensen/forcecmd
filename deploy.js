@@ -5,24 +5,19 @@ var JSZip = require("jszip");
 var xmldom = require("xmldom");
 var common = require("./common");
 
-var fileNames = process.argv.slice(2);
+var fileNames = [];
+var destroy = false;
+process.argv.slice(2).forEach(function(arg) {
+  if (arg == "--destroy") {
+    destroy = true;
+  } else if (arg[0] == "-") {
+    throw "Unknown argument: " + arg;
+  } else {
+    fileNames.push(arg);
+  }
+});
 
-function readAllFiles(fileNames) {
-  return Promise
-    .all(fileNames.map(function(fileName) {
-      return q.nfcall(fs.readFile, fileName).then(
-        function(data) { return {fileName: fileName, data: data}; },
-        function(err) { if (err.code != "ENOENT") { throw err; } return {fileName: fileName, data: null} }
-      );
-    }))
-    .then(function(readFiles) {
-      var files = {};
-      readFiles.forEach(function(readFile) { files[readFile.fileName] = readFile.data; });
-      return files;
-    });
-}
-
-var filesPromise = function(){
+function readAllFiles() {
   var readFiles = [];
 
   fileNames.forEach(function(fileName) {
@@ -38,12 +33,20 @@ var filesPromise = function(){
     }
   });
 
-  return readAllFiles(readFiles)
-    .then(function(files) {
+  return Promise
+    .all(readFiles.map(function(fileName) {
+      return q.nfcall(fs.readFile, fileName).then(
+        function(data) { return {fileName: fileName, data: data}; },
+        function(err) { if (err.code != "ENOENT") { throw err; } return {fileName: fileName, data: null} }
+      );
+    }))
+    .then(function(readFiles) {
+      var files = {};
+      readFiles.forEach(function(readFile) { files[readFile.fileName] = readFile.data; });
       console.log("Reading files done");
       return files;
     });
-}();
+}
 
 var conn;
 
@@ -55,7 +58,7 @@ Promise
         console.log("Describe");
         return conn.metadata.describe(common.apiVersion);
       }),
-    filesPromise
+    destroy ? null : readAllFiles()
   ])
   .then(function(res) {
     var describeResult = res[0];
@@ -84,21 +87,25 @@ Promise
     fileNames.forEach(function(fileName) {
       if (fileName.substr(-1) == "/") { // It is a "Folder". It does not have a main metadata file, only the -meta.xml file.
         var folderMetaName = fileName.substring(0, fileName.length - 1) + "-meta.xml"
-        if (files[folderMetaName] == null) {
+        if (!destroy && files[folderMetaName] == null) {
           throw "File not found: " + fileName;
         }
         var zipFileName = "unpackaged/" + folderMetaName.substring("src/".length);
-        zip.file(zipFileName, files[folderMetaName]);
+        if (!destroy) {
+          zip.file(zipFileName, files[folderMetaName]);
+        }
 
         var fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.length - "-meta.xml".length);
       } else {
-        if (files[fileName] == null) {
+        if (!destroy && files[fileName] == null) {
           throw "File not found: " + fileName;
         }
         var zipFileName = "unpackaged/" + fileName.substring("src/".length);
-        zip.file(zipFileName, files[fileName]);
-        if (files[fileName + "-meta.xml"] != null) {
-          zip.file(zipFileName + "-meta.xml",  files[fileName + "-meta.xml"]);
+        if (!destroy) {
+          zip.file(zipFileName, files[fileName]);
+          if (files[fileName + "-meta.xml"] != null) {
+            zip.file(zipFileName + "-meta.xml",  files[fileName + "-meta.xml"]);
+          }
         }
 
         var fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.lastIndexOf("."));
@@ -116,11 +123,20 @@ Promise
         ])
       );
     });
-    doc.documentElement.appendChild(T("version", common.apiVersion));
-    var xml = new xmldom.XMLSerializer().serializeToString(doc);
-    console.log(xml);
 
-    zip.file("unpackaged/package.xml", xml);
+    if (destroy) {
+      var destructiveChangesXml = new xmldom.XMLSerializer().serializeToString(doc);
+      console.log(destructiveChangesXml);
+      zip.file("unpackaged/destructiveChanges.xml", destructiveChangesXml);
+
+      doc = xmldom.DOMImplementation.prototype.createDocument("http://soap.sforce.com/2006/04/metadata", "Package");
+      doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
+    }
+
+    doc.documentElement.appendChild(T("version", common.apiVersion));
+    var packageXml = new xmldom.XMLSerializer().serializeToString(doc);
+    console.log(packageXml);
+    zip.file("unpackaged/package.xml", packageXml);
 
     return zip.generate({type: "base64"});
   })
