@@ -2,6 +2,7 @@ var jsforce = require("jsforce");
 var fs = require("graceful-fs");
 var Promise = require("jsforce/lib/promise");
 var q = require("q");
+
 module.exports.login = function() {
   return Promise
     .all([
@@ -23,4 +24,32 @@ module.exports.login = function() {
       console.log("Login");
       return conn.login(config.username, password).then(function() { return conn; });
     });
+}
+
+function asArray(x) {
+  if (!x) return [];
+  if (x instanceof Array) return x;
+  return [x];
+}
+module.exports.asArray = asArray;
+
+module.exports.complete = function complete(self) {
+  var deferred = Promise.defer();
+  var interval = 1000;
+  var poll = function() {
+    console.log("Check");
+    self.check().then(function(results) {
+      var done = results && asArray(results).every(function(result) { return result.done; });
+      if (done) {
+        deferred.resolve(results);
+      } else {
+        interval *= 1.3;
+        setTimeout(poll, interval);
+      }
+    }, function(err) {
+      deferred.reject(err);
+    });
+  };
+  setTimeout(poll, interval);
+  return deferred.promise;
 }

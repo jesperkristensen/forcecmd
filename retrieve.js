@@ -4,11 +4,8 @@ var q = require("q");
 var JSZip = require("jszip");
 var common = require("./common");
 
-function asArray(x) {
-  if (!x) return [];
-  if (x instanceof Array) return x;
-  return [x];
-}
+var asArray = common.asArray;
+
 function flattenArray(x) {
   return [].concat.apply([], x);
 }
@@ -27,27 +24,6 @@ function writeFile(path, data) {
     })();
   }
   return p.then(function() { return q.nfcall(fs.writeFile, path, data); });
-}
-
-function complete(self) {
-  var deferred = Promise.defer();
-  var interval = 1000;
-  var poll = function() {
-    console.log("Check");
-    self.check().then(function(results) {
-      var done = results && asArray(results).every(function(result) { return result.done; });
-      if (done) {
-        deferred.resolve(results);
-      } else {
-        interval *= 1.3;
-        setTimeout(poll, interval);
-      }
-    }, function(err) {
-      deferred.reject(err);
-    });
-  };
-  setTimeout(poll, interval);
-  return deferred.promise;
 }
 
 var conn;
@@ -116,7 +92,7 @@ common.login()
       .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return y.fullName; })}; });
     //console.log(types);
     console.log("Retrieve");
-    return complete(
+    return common.complete(
       conn.metadata
         .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
     );
