@@ -104,7 +104,7 @@ common.login()
   .then(function(res) {
     console.log("Reading response");
     var files = [];
-    files.push(writeFile("status.json", JSON.stringify({fileProperties: res.fileProperties, messages: res.messages})));
+    files.push(writeFile("status.json", JSON.stringify({fileProperties: res.fileProperties, messages: res.messages}, null, "    ")));
     var zip = new JSZip(res.zipFile, {base64: true});
     for (var p in zip.files) {
       var file = zip.files[p];
