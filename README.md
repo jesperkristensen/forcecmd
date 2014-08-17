@@ -43,6 +43,10 @@ and work around some bugs and limitations in the metadata API.
 1. Navigate your command prompt to our org's directory.
 2. Type for example `node path/to/this/tool/deploy.js src/classes/MyClass.cls src/objects/Account.object`.
 
+Additional arguments:
+* `--destroy`: Delete all the listed files instead of updating them.
+* `'--options={"rollbackOnError":true}'`: Specify deployment options as documented on http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
+
 ## License
 
 MIT
