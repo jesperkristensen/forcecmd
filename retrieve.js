@@ -38,7 +38,7 @@ common.login()
     var x = res.metadataObjects
       .filter(function(metadataObject) { return metadataObject.xmlName != "InstalledPackage"; })
       .map(function(metadataObject) {
-        var xmlNames = metadataObject.childXmlNames ? metadataObject.childXmlNames.concat(metadataObject.xmlName) : [metadataObject.xmlName];
+        var xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
         // TODO: should we avoid hardcoding the excluded component types?
         xmlNames = xmlNames.filter(function(xmlName) { return typeof xmlName == "string" && ["ApexTriggerCoupling", "WorkflowActionFlow"].indexOf(xmlName) == -1; });
         if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
@@ -54,16 +54,22 @@ common.login()
           return xmlNames.map(function(xmlName) {
             return folders
               .then(function(folders) {
+                var folderGroups = [];
+                folders.forEach(function(folder) {
+                  if (folderGroups.length == 0 || folderGroups[folderGroups.length - 1].length == 3) {
+                    folderGroups.push([]);
+                  }
+                  folderGroups[folderGroups.length - 1].push(folder);
+                });
                 return Promise
-                  .all(folders.map(function(folder) {
-                    console.log("List " + xmlName + "/" + folder.fullName);
-                    return conn.metadata.list({type: xmlName, folder: folder.fullName}).then(asArray);
+                  .all(folderGroups.map(function(folderGroup) {
+                    console.log("List " + folderGroup.map(function(folder) { return xmlName + "/" + folder.fullName; }).join(", "));
+                    return conn.metadata.list(folderGroup.map(function(folder) { return {type: xmlName, folder: folder.fullName}; })).then(asArray);
                   }))
                   .then(function(p) {
-                    return p.concat(folders.map(function(folder) { return {type: xmlName, fullName: folder.fullName}; }));
+                    return flattenArray(p).concat(folders.map(function(folder) { return {type: xmlName, fullName: folder.fullName}; }));
                   });
-              })
-              .then(flattenArray);
+              });
           });
         } else {
           return xmlNames.map(function(xmlName) {
