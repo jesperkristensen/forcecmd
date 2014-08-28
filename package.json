@@ -7,6 +7,7 @@
     "jszip": "2.2.x",
     "xmldom": "0.1.x",
     "graceful-fs": "3.0.2",
+    "fs-extra": "0.11.0",
     "jsforce": "^1.1.0"
   }
 }
