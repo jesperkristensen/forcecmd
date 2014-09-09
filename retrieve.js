@@ -122,7 +122,7 @@ common.login()
       messages: res.messages
     }, null, "    ")));
 
-    var zip = new JSZip(res.zipFile, {base64: true});
+    var zip = new JSZip(new Buffer(res.zipFile, "base64"));
     for (var p in zip.files) {
       var file = zip.files[p];
       if (!file.options.dir) {
