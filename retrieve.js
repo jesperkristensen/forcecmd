@@ -108,6 +108,9 @@ common.login()
     return conn.metadata.checkRetrieveStatus(result.id);
   })
   .then(function(res) {
+    if (res.success != "true") {
+      throw res;
+    }
     console.log("Reading response and writing files");
     // We wait until the old files are removed before we create the new
     return q.nfcall(fs.remove, "src/").then(function() { return res; });
