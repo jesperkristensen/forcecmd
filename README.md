@@ -40,14 +40,14 @@ and work around some bugs and limitations in the metadata API.
 
 All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
 
-        {
-          "apiVersion": "31.0",
-          "loginUrl": "https://login.salesforce.com/",
-          "username": "yourname@yourcompany.com",
-          "excludeDirs": ["documents"],
-          "excludeObjects": ["MyCustomSetting__c"],
-          "includeObjects": ["Product2", "Pricebook2"]
-        }
+    {
+      "apiVersion": "31.0",
+      "loginUrl": "https://login.salesforce.com/",
+      "username": "yourname@yourcompany.com",
+      "excludeDirs": ["documents"],
+      "excludeObjects": ["MyCustomSetting__c"],
+      "includeObjects": ["Product2", "Pricebook2"]
+    }
 
 ## Deploy changes
 
