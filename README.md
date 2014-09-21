@@ -9,7 +9,7 @@ and work around some bugs and limitations in the metadata API.
 ## Installation
 
 1. Install Node.js from http://nodejs.org/.
-2. Clone this repository or download te source as a ZIP file.
+2. Clone this repository or download the source as a ZIP file.
 3. Open a command prompt. (Tested in MinGW)
 4. Navigate to the root of the source tree from step 2.
 5.  Run `npm install`.
@@ -20,7 +20,7 @@ and work around some bugs and limitations in the metadata API.
 2. Create a new file in your org's directory named `forcecmd.json` with content like this:
 
         {
-          "apiVersion": "30.0",
+          "apiVersion": "31.0",
           "loginUrl": "https://login.salesforce.com/",
           "username": "yourname@yourcompany.com"
         }
@@ -37,6 +37,17 @@ and work around some bugs and limitations in the metadata API.
 
 1. Navigate your command prompt to our org's directory.
 2. Type `node path/to/this/tool/retrieve.js`.
+
+All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
+
+        {
+          "apiVersion": "31.0",
+          "loginUrl": "https://login.salesforce.com/",
+          "username": "yourname@yourcompany.com",
+          "excludeDirs": ["documents"],
+          "excludeObjects": ["MyCustomSetting__c"],
+          "includeObjects": ["Product2", "Pricebook2"]
+        }
 
 ## Deploy changes
 
