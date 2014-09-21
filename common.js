@@ -15,6 +15,8 @@ module.exports.login = function() {
       var config = JSON.parse(file);
       module.exports.apiVersion = config.apiVersion;
       module.exports.excludeDirs = config.excludeDirs || [];
+      module.exports.includeObjects = config.includeObjects || [];
+      module.exports.excludeObjects = config.excludeObjects || [];
       var password = JSON.parse(pwfile).passwords[config.loginUrl + "$" + config.username];
       if (!config.loginUrl) throw "Missing loginUrl";
       if (!config.username) throw "Missing username";

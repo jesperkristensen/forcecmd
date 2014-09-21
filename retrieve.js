@@ -27,10 +27,43 @@ function writeFile(path, data) {
 }
 
 var conn;
-common.login()
+var login = common.login()
   .then(function(c) {
     conn = c;
-    console.log("Describe");
+  });
+
+login
+  .then(function() {
+    console.log("DescribeGlobal");
+    return conn.describeGlobal();
+  })
+  .then(function(describe) {
+    var customSettings = describe.sobjects
+      .filter(function(sobject) { return sobject.customSetting; })
+      .map(function(sobject) { return sobject.name; });
+
+    var objects = common.includeObjects
+      .concat(customSettings)
+      .filter(function(sobject) { return common.excludeObjects.indexOf(sobject) == -1; });
+
+    var results = objects.map(function(object) {
+      console.log("DescribeSObject " + object);
+      console.log("Query " + object);
+      return conn.sobject(object).find().execute()
+        .then(function(records) {
+          for (var i = 0; i < records.length; i++) {
+            delete records[i].attributes;
+          }
+          return writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
+        });
+    });
+    return Promise.all(results);
+  })
+  .then(null, function(err) { console.error(err); });
+
+login
+  .then(function() {
+    console.log("DescribeMetadata");
     return conn.metadata.describe(common.apiVersion);
   })
   .then(function(res) {
@@ -47,7 +80,7 @@ common.login()
         }
         if (metadataObject.inFolder) {
           var folderType = metadataObject.xmlName == "EmailTemplate" ? "EmailFolder" : metadataObject.xmlName + "Folder";
-          console.log("List " + folderType);
+          console.log("ListMetadata " + folderType);
           var folders = conn.metadata
             .list({type: folderType})
             .then(asArray);
@@ -63,7 +96,7 @@ common.login()
                 });
                 return Promise
                   .all(folderGroups.map(function(folderGroup) {
-                    console.log("List " + folderGroup.map(function(folder) { return xmlName + "/" + folder.fullName; }).join(", "));
+                    console.log("ListMetadata " + folderGroup.map(function(folder) { return xmlName + "/" + folder.fullName; }).join(", "));
                     return conn.metadata.list(folderGroup.map(function(folder) { return {type: xmlName, folder: folder.fullName}; })).then(asArray);
                   }))
                   .then(function(p) {
@@ -74,11 +107,11 @@ common.login()
         } else {
           return xmlNames.map(function(xmlName) {
             if (["AnalyticSnapshot", "RemoteSiteSetting", "ApexTriggerCoupling", "Folder", "PackageManifest", "CustomObjectSharingRules", "CustomObjectOwnerSharingRule", "CustomObjectCriteriaBasedSharingRule", "AutoResponseRule", "AssignmentRule", "EscalationRule", "Translations"].indexOf(xmlName) != -1) {
-              console.log("List " + xmlName);
+              console.log("ListMetadata " + xmlName);
               return conn.metadata.list({type: xmlName}).then(asArray);
             }
             if (xmlName == "CustomObject") {
-              console.log("List " + xmlName);
+              console.log("ListMetadata " + xmlName);
               return conn.metadata.list({type: xmlName}).then(function(z) {
                 z = asArray(z);
                 z = z.filter(function(a) { return a.fullName.indexOf("__c") == -1; });
