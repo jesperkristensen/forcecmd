@@ -128,7 +128,7 @@ login
   .then(function (res) {
     var types = res
       .filter(function(x) { return x.length > 0})
-      .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return y.fullName; })}; });
+      .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return decodeURIComponent(y.fullName); })}; });
     //console.log(types);
     console.log("Retrieve");
     return common.complete(
