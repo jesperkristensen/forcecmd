@@ -147,12 +147,13 @@ Promise
   .then(function(zipFile) {
     conn.metadata.pollTimeout = 100000;
     console.log("Deploy");
-    var p = common.complete(conn.metadata.deploy(new Buffer(zipFile, "base64"), deployOptions));
-    return p;
+    return conn.metadata.deploy(new Buffer(zipFile, "base64"), deployOptions);
   })
   .then(function(result) {
-    console.log("CheckDeployStatus");
-    return conn.metadata.checkDeployStatus(result.id, true);
+    return common.complete(function() {
+      console.log("CheckDeployStatus");
+      return conn.metadata.checkDeployStatus(result.id, true);
+    }, function(result) { return result.done !== false; });
   })
   .then(function(res) {
     console.log("Status: " + res.status);

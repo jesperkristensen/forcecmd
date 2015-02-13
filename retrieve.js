@@ -131,14 +131,13 @@ login
       .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return decodeURIComponent(y.fullName); })}; });
     //console.log(types);
     console.log("Retrieve");
-    return common.complete(
-      conn.metadata
-        .retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}})
-    );
+    return conn.metadata.retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}});
   })
   .then(function(result) {
-    console.log("CheckRetrieveStatus");
-    return conn.metadata.checkRetrieveStatus(result.id);
+    return common.complete(function() {
+      console.log("CheckRetrieveStatus");
+      return conn.metadata.checkRetrieveStatus(result.id);
+    }, function(result) { return result.done !== "false"; });
   })
   .then(function(res) {
     if (res.success != "true") {

@@ -35,15 +35,13 @@ function asArray(x) {
 }
 module.exports.asArray = asArray;
 
-module.exports.complete = function complete(self) {
+module.exports.complete = function complete(doCheck, isDone) {
   var deferred = Promise.defer();
   var interval = 1000;
   var poll = function() {
-    console.log("Check");
-    self.check().then(function(results) {
-      var done = results && asArray(results).every(function(result) { return result.done; });
-      if (done) {
-        deferred.resolve(results);
+    doCheck().then(function(result) {
+      if (isDone(result)) {
+        deferred.resolve(result);
       } else {
         interval *= 1.3;
         setTimeout(poll, interval);
