@@ -130,14 +130,24 @@ login
       .filter(function(x) { return x.length > 0})
       .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return decodeURIComponent(y.fullName); })}; });
     //console.log(types);
-    console.log("Retrieve");
-    return conn.metadata.retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}});
-  })
-  .then(function(result) {
-    return common.complete(function() {
-      console.log("CheckRetrieveStatus");
-      return conn.metadata.checkRetrieveStatus(result.id);
-    }, function(result) { return result.done !== "false"; });
+    function retrieve() {
+      console.log("Retrieve");
+      return conn.metadata.retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}).then(function(result) {
+        console.log("  " + result.id);
+        return common.complete(function() {
+          console.log("CheckRetrieveStatus");
+          return conn.metadata.checkRetrieveStatus(result.id);
+        }, function(result) { return result.done !== "false"; });
+      }).then(function(res) {
+        if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {
+          // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
+          console.error(res);
+          return retrieve();
+        }
+        return res;
+      });
+    }
+    return retrieve();
   })
   .then(function(res) {
     if (res.success != "true") {
