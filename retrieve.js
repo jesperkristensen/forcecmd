@@ -75,7 +75,7 @@ login
         // TODO: should we avoid hardcoding the excluded component types?
         xmlNames = xmlNames.filter(function(xmlName) { return typeof xmlName == "string" && ["ApexTriggerCoupling", "WorkflowActionFlow"].indexOf(xmlName) == -1; });
         if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
-          console.log("Excluding " + metadataObject.directoryName);
+          console.log("(Excluding " + metadataObject.directoryName + ")");
           return [];
         }
         if (metadataObject.inFolder) {
@@ -133,7 +133,7 @@ login
     function retrieve() {
       console.log("Retrieve");
       return conn.metadata.retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}).then(function(result) {
-        console.log("  " + result.id);
+        console.log({id: result.id});
         return common.complete(function() {
           console.log("CheckRetrieveStatus");
           return conn.metadata.checkRetrieveStatus(result.id);
@@ -153,7 +153,7 @@ login
     if (res.success != "true") {
       throw res;
     }
-    console.log("Reading response and writing files");
+    console.log("(Reading response and writing files)");
     // We wait until the old files are removed before we create the new
     return q.nfcall(fs.remove, "src/").then(function() { return res; });
   })

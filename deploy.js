@@ -25,7 +25,7 @@ function readAllFiles() {
   var readFiles = [];
 
   fileNames.forEach(function(fileName) {
-    console.log(fileName);
+    console.log("- " + fileName);
     if (fileName.indexOf("src/") != 0) {
       throw "Not a source file: " + fileName;
     }
@@ -47,7 +47,7 @@ function readAllFiles() {
     .then(function(readFiles) {
       var files = {};
       readFiles.forEach(function(readFile) { files[readFile.fileName] = readFile.data; });
-      console.log("Reading files done");
+      console.log("(Reading files done)");
       return files;
     });
 }
@@ -156,7 +156,6 @@ Promise
     }, function(result) { return result.done !== false; });
   })
   .then(function(res) {
-    console.log("Status: " + res.status);
-    console.log(common.asArray(res.details.componentFailures));
+    console.log({status: res.status, errors: common.asArray(res.details.componentFailures)});
   })
   .then(null, function(err) { console.error(err); });
