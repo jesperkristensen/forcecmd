@@ -150,6 +150,7 @@ Promise
     return conn.metadata.deploy(new Buffer(zipFile, "base64"), deployOptions);
   })
   .then(function(result) {
+    console.log({id: result.id});
     return common.complete(function() {
       console.log("CheckDeployStatus");
       return conn.metadata.checkDeployStatus(result.id, true);
