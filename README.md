@@ -49,6 +49,8 @@ All metadata and all custom settings are downloaded by default. You can customiz
       "includeObjects": ["Product2", "Pricebook2"]
     }
 
+Upon completion the tool will typically print a number of messages from the Metadata API indicating problems. This is normal. If the status is Succeeded, you can ignore the messages.
+
 ## Deploy changes
 
 1. Navigate your command prompt to our org's directory.
