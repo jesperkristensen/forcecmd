@@ -175,7 +175,7 @@ login
         files.push(writeFile(name, file.asNodeBuffer()));
       }
     }
-    console.log(res.messages);
+    console.log({messages: res.messages, status: res.status});
     return Promise.all(files);
   })
   .then(null, function(err) { console.error(err); });
