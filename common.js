@@ -23,7 +23,7 @@ module.exports.login = function() {
       if (!password) throw "Missing password";
       if (!config.apiVersion) throw "Missing apiVersion";
       var conn = new jsforce.Connection({loginUrl: config.loginUrl, version: module.exports.apiVersion});
-      console.log("Login");
+      console.log("Login " + config.loginUrl + " " + config.username + " " + config.apiVersion);
       return conn.login(config.username, password).then(function() { return conn; });
     });
 }
