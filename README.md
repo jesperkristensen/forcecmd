@@ -9,10 +9,8 @@ and work around some bugs and limitations in the metadata API.
 ## Installation
 
 1. Install Node.js from http://nodejs.org/.
-2. Clone this repository or download the source as a ZIP file.
-3. Open a command prompt. (Tested in MinGW)
-4. Navigate to the root of the source tree from step 2.
-5.  Run `npm install`.
+2. Open a command prompt. (Tested in MinGW)
+3. Run `npm install -g jesperkristensen/forcecmd`.
 
 ## Set up an org
 
@@ -36,7 +34,7 @@ and work around some bugs and limitations in the metadata API.
 ## Download an org
 
 1. Navigate your command prompt to our org's directory.
-2. Type `node path/to/this/tool/retrieve.js`.
+2. Type `forcecmd retrieve`.
 
 All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
 
@@ -54,11 +52,17 @@ Upon completion the tool will typically print a number of messages from the Meta
 ## Deploy changes
 
 1. Navigate your command prompt to our org's directory.
-2. Type for example `node path/to/this/tool/deploy.js src/classes/MyClass.cls src/objects/Account.object`.
+2. Type for example `forcecmd deploy src/classes/MyClass.cls src/objects/Account.object`.
 
 Additional arguments:
 * `--destroy`: Delete all the listed files instead of updating them.
 * `'--options={"rollbackOnError":true}'`: Specify deployment options as documented on http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
+
+## Set up development environment
+
+1. Clone this repository.
+2. From the root of the cloned repository, run `npm install`.
+3. Replace `forcecmd` with `node path/to/this/tool/cli.js` when you use the tool.
 
 ## License
 
