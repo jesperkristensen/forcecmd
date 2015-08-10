@@ -107,18 +107,9 @@ module.exports.retrieve = function() {
             });
           } else {
             return xmlNames.map(function(xmlName) {
-              if (["AnalyticSnapshot", "RemoteSiteSetting", "ApexTriggerCoupling", "Folder", "PackageManifest", "CustomObjectSharingRules", "CustomObjectOwnerSharingRule", "CustomObjectCriteriaBasedSharingRule", "AutoResponseRule", "AssignmentRule", "EscalationRule", "Translations"].indexOf(xmlName) != -1) {
+              if (["AnalyticSnapshot", "RemoteSiteSetting", "ApexTriggerCoupling", "Folder", "PackageManifest", "CustomObjectSharingRules", "CustomObjectOwnerSharingRule", "CustomObjectCriteriaBasedSharingRule", "AutoResponseRule", "AssignmentRule", "EscalationRule", "Translations", "CustomObject"].indexOf(xmlName) != -1) {
                 console.log("ListMetadata " + xmlName);
                 return conn.metadata.list({type: xmlName}).then(asArray);
-              }
-              if (xmlName == "CustomObject") {
-                console.log("ListMetadata " + xmlName);
-                return conn.metadata.list({type: xmlName}).then(function(z) {
-                  z = asArray(z);
-                  z = z.filter(function(a) { return a.fullName.indexOf("__c") == -1; });
-                  z.push({type: metadataObject.xmlName, fullName: "*"});
-                  return z;
-                })
               }
               return new Promise([{type: xmlName, fullName: "*"}]);
             });
