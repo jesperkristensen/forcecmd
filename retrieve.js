@@ -107,11 +107,8 @@ module.exports.retrieve = function() {
             });
           } else {
             return xmlNames.map(function(xmlName) {
-              if (["AnalyticSnapshot", "RemoteSiteSetting", "ApexTriggerCoupling", "Folder", "PackageManifest", "CustomObjectSharingRules", "CustomObjectOwnerSharingRule", "CustomObjectCriteriaBasedSharingRule", "AutoResponseRule", "AssignmentRule", "EscalationRule", "Translations", "CustomObject"].indexOf(xmlName) != -1) {
-                console.log("ListMetadata " + xmlName);
-                return conn.metadata.list({type: xmlName}).then(asArray);
-              }
-              return new Promise([{type: xmlName, fullName: "*"}]);
+              console.log("ListMetadata " + xmlName);
+              return conn.metadata.list({type: xmlName}).then(asArray);
             });
           }
         });
