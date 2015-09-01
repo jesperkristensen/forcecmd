@@ -12,7 +12,7 @@ module.exports.retrieve = function() {
   }
 
   function writeFile(path, data) {
-    var p = new Promise();
+    var p = Promise.resolve();
     var pos = -1;
     while (true) {
       pos = path.indexOf("/", pos + 1);
