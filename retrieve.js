@@ -62,62 +62,81 @@ module.exports.retrieve = function() {
     })
     .then(null, function(err) { console.error(err); });
 
+  function groupByThree(list) {
+    var groups = [];
+    list.forEach(function(element) {
+      if (groups.length == 0 || groups[groups.length - 1].length == 3) {
+        groups.push([]);
+      }
+      groups[groups.length - 1].push(element);
+    });
+    return groups;
+  }
+
   login
     .then(function() {
       console.log("DescribeMetadata");
       return conn.metadata.describe(common.apiVersion);
     })
     .then(function(res) {
-      // TODO: Batch list calls into groups of three
+      var folderMap = {};
       var x = res.metadataObjects
         .filter(function(metadataObject) { return metadataObject.xmlName != "InstalledPackage"; })
-        .map(function(metadataObject) {
-          var xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
-          // TODO: should we avoid hardcoding the excluded component types?
-          xmlNames = xmlNames.filter(function(xmlName) { return typeof xmlName == "string" && ["ApexTriggerCoupling", "WorkflowActionFlow"].indexOf(xmlName) == -1; });
+        .filter(function(metadataObject) {
           if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
             console.log("(Excluding " + metadataObject.directoryName + ")");
-            return [];
+            return false;
           }
-          if (metadataObject.inFolder) {
-            var folderType = metadataObject.xmlName == "EmailTemplate" ? "EmailFolder" : metadataObject.xmlName + "Folder";
-            console.log("ListMetadata " + folderType);
-            var folders = conn.metadata
-              .list({type: folderType})
-              .then(asArray);
-            return xmlNames.map(function(xmlName) {
-              return folders
-                .then(function(folders) {
-                  var folderGroups = [];
-                  folders.forEach(function(folder) {
-                    if (folderGroups.length == 0 || folderGroups[folderGroups.length - 1].length == 3) {
-                      folderGroups.push([]);
-                    }
-                    folderGroups[folderGroups.length - 1].push(folder);
-                  });
-                  return Promise
-                    .all(folderGroups.map(function(folderGroup) {
-                      console.log("ListMetadata " + folderGroup.map(function(folder) { return xmlName + "/" + folder.fullName; }).join(", "));
-                      return conn.metadata.list(folderGroup.map(function(folder) { return {type: xmlName, folder: folder.fullName}; })).then(asArray);
-                    }))
-                    .then(function(p) {
-                      return flattenArray(p).concat(folders.map(function(folder) { return {type: xmlName, fullName: folder.fullName}; }));
-                    });
-                });
-            });
-          } else {
-            return xmlNames.map(function(xmlName) {
-              console.log("ListMetadata " + xmlName);
-              return conn.metadata.list({type: xmlName}).then(asArray);
-            });
-          }
+          return true;
+        })
+        .map(function(metadataObject) {
+          var xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
+          return xmlNames.map(function(xmlName) {
+            if (metadataObject.inFolder) {
+              if (xmlName == "EmailTemplate") {
+                folderMap["EmailFolder"] = "EmailTemplate";
+                xmlName = "EmailFolder";
+              } else {
+                folderMap[xmlName + "Folder"] = xmlName;
+                xmlName = xmlName + "Folder";
+              }
+            }
+            return xmlName;
+          });
         });
-      return Promise.all(flattenArray(x));
+      return Promise.all(groupByThree(flattenArray(x)).map(function(xmlNames) {
+        console.log("ListMetadata " + xmlNames.join(", "));
+        return conn.metadata
+          .list(xmlNames.map(function(xmlName) { return {type: xmlName}; }))
+          .then(asArray)
+          .then(function(someItems) {
+            var folders = someItems.filter(function(folder) { return folderMap[folder.type]});
+            var nonFolders = someItems.filter(function(folder) { return !folderMap[folder.type]});
+            return Promise
+              .all(groupByThree(folders).map(function(folderGroup) {
+                console.log("ListMetadata " + folderGroup.map(function(folder) { return folderMap[folder.type] + "/" + folder.fullName; }).join(", "));
+                return conn.metadata.list(folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })).then(asArray);
+              }))
+              .then(function(p) {
+                return flattenArray(p).concat(folders.map(function(folder) { return {type: folderMap[folder.type], fullName: folder.fullName}; }), nonFolders);
+              });
+          });
+      }));
     })
     .then(function (res) {
-      var types = res
-        .filter(function(x) { return x.length > 0})
-        .map(function(x) { return {name: x[0].type, members: x.map(function(y) { return decodeURIComponent(y.fullName); })}; });
+      var types = flattenArray(res);
+      types.sort(function(a, b) {
+        var ka = a.type + "~" + a.fullName;
+        var kb = b.type + "~" + b.fullName;
+        if (ka < kb) {
+          return -1;
+        }
+        if (ka > kb) {
+          return 1;
+        }
+        return 0;
+      });
+      types = types.map(function(x) { return {name: x.type, members: decodeURIComponent(x.fullName)}; });
       //console.log(types);
       function retrieve() {
         console.log("Retrieve");
