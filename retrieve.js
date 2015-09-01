@@ -118,7 +118,11 @@ module.exports.retrieve = function() {
                 return conn.metadata.list(folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })).then(asArray);
               }))
               .then(function(p) {
-                return flattenArray(p).concat(folders.map(function(folder) { return {type: folderMap[folder.type], fullName: folder.fullName}; }), nonFolders);
+                return flattenArray(p).concat(
+                  folders.map(function(folder) { return {type: folderMap[folder.type], fullName: folder.fullName}; }),
+                  nonFolders,
+                  xmlNames.map(function(xmlName) { return {type: xmlName, fullName: '*'}; })
+                );
               });
           });
       }));
