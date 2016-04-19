@@ -1,5 +1,6 @@
 "use strict";
-var fs = require("fs-extra");
+var fs = require("graceful-fs");
+var rimraf = require('rimraf')
 var JSZip = require("jszip");
 var common = require("./common");
 
@@ -166,7 +167,7 @@ module.exports.retrieve = function() {
       }
       console.log("(Reading response and writing files)");
       // We wait until the old files are removed before we create the new
-      return common.nfcall(fs.remove, "src/").then(function() { return res; });
+      return common.nfcall(rimraf, "src/").then(function() { return res; });
     })
     .then(function(res) {
       var files = [];
