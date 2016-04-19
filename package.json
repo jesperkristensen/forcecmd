@@ -6,9 +6,9 @@
   },
   "dependencies": {
     "jszip": "2.2.x",
-    "xmldom": "0.1.x",
-    "graceful-fs": "3.0.2",
-    "rimraf": "2.5.2",
-    "xml2js": "0.4.16"
+    "xmldom": "*",
+    "graceful-fs": "*",
+    "rimraf": "*",
+    "xml2js": "*"
   }
 }
