@@ -1,6 +1,5 @@
+"use strict";
 var fs = require("graceful-fs");
-var Promise = require("jsforce/lib/promise");
-var q = require("q");
 var JSZip = require("jszip");
 var xmldom = require("xmldom");
 var common = require("./common");
@@ -40,7 +39,7 @@ module.exports.deploy = function(cliArgs) {
 
     return Promise
       .all(readFiles.map(function(fileName) {
-        return q.nfcall(fs.readFile, fileName).then(
+        return common.nfcall(fs.readFile, fileName).then(
           function(data) { return {fileName: fileName, data: data}; },
           function(err) { if (err.code != "ENOENT") { throw err; } return {fileName: fileName, data: null} }
         );
@@ -53,15 +52,12 @@ module.exports.deploy = function(cliArgs) {
       });
   }
 
-  var conn;
-
   Promise
     .all([
       common.login()
         .then(function(c) {
-          conn = c;
           console.log("Describe");
-          return conn.metadata.describe(common.apiVersion);
+          return common.askSalesforceMetadata("describeMetadata", {apiVersion: common.apiVersion});
         }),
       destroy ? null : readAllFiles()
     ])
@@ -146,16 +142,15 @@ module.exports.deploy = function(cliArgs) {
       return zip.generate({type: "base64"});
     })
     .then(function(zipFile) {
-      conn.metadata.pollTimeout = 100000;
       console.log("Deploy");
-      return conn.metadata.deploy(new Buffer(zipFile, "base64"), deployOptions);
+      return common.askSalesforceMetadata("deploy", {zipFile, deployOptions});
     })
     .then(function(result) {
       console.log({id: result.id});
       return common.complete(function() {
         console.log("CheckDeployStatus");
-        return conn.metadata.checkDeployStatus(result.id, true);
-      }, function(result) { return result.done !== false; });
+        return common.askSalesforceMetadata("checkDeployStatus", {id: result.id, includeDetails: true});
+      }, function(result) { return result.done !== "false"; });
     })
     .then(function(res) {
       console.log({status: res.status, errors: common.asArray(res.details.componentFailures)});

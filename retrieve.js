@@ -1,6 +1,5 @@
+"use strict";
 var fs = require("fs-extra");
-var Promise = require("jsforce/lib/promise");
-var q = require("q");
 var JSZip = require("jszip");
 var common = require("./common");
 
@@ -21,22 +20,18 @@ module.exports.retrieve = function() {
       }
       (function() {
         var dir = path.substring(0, pos);
-        p = p.then(function() { return q.nfcall(fs.mkdir, dir); }).then(null, function(err) { if (err.code != "EEXIST") throw err; });
+        p = p.then(function() { return common.nfcall(fs.mkdir, dir); }).then(null, function(err) { if (err.code != "EEXIST") throw err; });
       })();
     }
-    return p.then(function() { return q.nfcall(fs.writeFile, path, data); });
+    return p.then(function() { return common.nfcall(fs.writeFile, path, data); });
   }
 
-  var conn;
-  var login = common.login()
-    .then(function(c) {
-      conn = c;
-    });
+  var login = common.login();
 
   login
     .then(function() {
       console.log("DescribeGlobal");
-      return conn.describeGlobal();
+      return common.askSalesforce("/services/data/v" + common.apiVersion + "/sobjects");
     })
     .then(function(describe) {
       var customSettings = describe.sobjects
@@ -49,9 +44,14 @@ module.exports.retrieve = function() {
 
       var results = objects.map(function(object) {
         console.log("DescribeSObject " + object);
-        console.log("Query " + object);
-        return conn.sobject(object).find().execute()
-          .then(function(records) {
+        return common.askSalesforce("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
+          .then(function(objectDescribe) {
+            let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
+            console.log("Query " + object);
+            return common.askSalesforce("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
+          })
+          .then(function(data) {
+            let records = data.records;
             for (var i = 0; i < records.length; i++) {
               delete records[i].attributes;
             }
@@ -76,7 +76,7 @@ module.exports.retrieve = function() {
   login
     .then(function() {
       console.log("DescribeMetadata");
-      return conn.metadata.describe(common.apiVersion);
+      return common.askSalesforceMetadata("describeMetadata", {apiVersion: common.apiVersion});
     })
     .then(function(res) {
       var folderMap = {};
@@ -92,7 +92,7 @@ module.exports.retrieve = function() {
         .map(function(metadataObject) {
           var xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
           return xmlNames.map(function(xmlName) {
-            if (metadataObject.inFolder) {
+            if (metadataObject.inFolder == "true") {
               if (xmlName == "EmailTemplate") {
                 folderMap["EmailFolder"] = "EmailTemplate";
                 xmlName = "EmailFolder";
@@ -106,8 +106,7 @@ module.exports.retrieve = function() {
         });
       return Promise.all(groupByThree(flattenArray(x)).map(function(xmlNames) {
         console.log("ListMetadata " + xmlNames.join(", "));
-        return conn.metadata
-          .list(xmlNames.map(function(xmlName) { return {type: xmlName}; }))
+        return common.askSalesforceMetadata("listMetadata", {queries: xmlNames.map(function(xmlName) { return {type: xmlName}; })})
           .then(asArray)
           .then(function(someItems) {
             var folders = someItems.filter(function(folder) { return folderMap[folder.type]});
@@ -115,7 +114,7 @@ module.exports.retrieve = function() {
             return Promise
               .all(groupByThree(folders).map(function(folderGroup) {
                 console.log("ListMetadata " + folderGroup.map(function(folder) { return folderMap[folder.type] + "/" + folder.fullName; }).join(", "));
-                return conn.metadata.list(folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })).then(asArray);
+                return common.askSalesforceMetadata("listMetadata", {queries: folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })}).then(asArray);
               }))
               .then(function(p) {
                 return flattenArray(p).concat(
@@ -144,11 +143,11 @@ module.exports.retrieve = function() {
       //console.log(types);
       function retrieve() {
         console.log("Retrieve");
-        return conn.metadata.retrieve({apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}).then(function(result) {
+        return common.askSalesforceMetadata("retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}}).then(function(result) {
           console.log({id: result.id});
           return common.complete(function() {
             console.log("CheckRetrieveStatus");
-            return conn.metadata.checkRetrieveStatus(result.id);
+            return common.askSalesforceMetadata("checkRetrieveStatus", {id: result.id});
           }, function(result) { return result.done !== "false"; });
         }).then(function(res) {
           if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {
@@ -167,7 +166,7 @@ module.exports.retrieve = function() {
       }
       console.log("(Reading response and writing files)");
       // We wait until the old files are removed before we create the new
-      return q.nfcall(fs.remove, "src/").then(function() { return res; });
+      return common.nfcall(fs.remove, "src/").then(function() { return res; });
     })
     .then(function(res) {
       var files = [];
