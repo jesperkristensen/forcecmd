@@ -1,115 +1,102 @@
 "use strict";
-var fs = require("graceful-fs");
-var rimraf = require('rimraf');
-var JSZip = require("jszip");
-var common = require("./common");
+let fs = require("graceful-fs");
+let rimraf = require('rimraf');
+let JSZip = require("jszip");
+let common = require("./common");
 
-module.exports.retrieve = function(cliArgs) {
-  var verbose = cliArgs.indexOf("--verbose") > -1;
-  if (cliArgs.some(function(a) { return a != "--verbose"; })) {
-    throw "unknown argument";
-  }
-  var asArray = common.asArray;
-
-  function flattenArray(x) {
-    return [].concat.apply([], x);
-  }
-
-  function writeFile(path, data) {
-    var p = Promise.resolve();
-    var pos = -1;
-    while (true) {
-      pos = path.indexOf("/", pos + 1);
-      if (pos == -1) {
-        break;
-      }
-      (function() {
-        var dir = path.substring(0, pos);
-        p = p.then(function() { return common.nfcall(fs.mkdir, dir); }).then(null, function(err) { if (err.code != "EEXIST") throw err; });
-      })();
+module.exports.retrieve = common.async(function*(cliArgs) {
+  try {
+    let verbose = cliArgs.indexOf("--verbose") > -1;
+    if (cliArgs.some(a => a != "--verbose")) {
+      throw "unknown argument";
     }
-    return p.then(function() { return common.nfcall(fs.writeFile, path, data); });
-  }
+    let asArray = common.asArray;
 
-  var conn;
-  var login = common.login({verbose})
-    .then(function(c) {
-      conn = c;
+    function flattenArray(x) {
+      return [].concat.apply([], x);
+    }
+
+    let writeFile = common.async(function*(path, data) {
+      let pos = -1;
+      while (true) {
+        pos = path.indexOf("/", pos + 1);
+        if (pos == -1) {
+          break;
+        }
+        let dir = path.substring(0, pos);
+        try {
+          yield common.nfcall(fs.mkdir, dir);
+        } catch (err) {
+          if (err.code != "EEXIST") throw err;
+        }
+      }
+      yield common.nfcall(fs.writeFile, path, data);
     });
 
-  login
-    .then(function() {
+    let conn = yield common.login({verbose});
+
+    let dataPromise = common.async(function*() {
       console.log("DescribeGlobal");
-      return conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
-    })
-    .then(function(describe) {
-      var customSettings = describe.sobjects
-        .filter(function(sobject) { return sobject.customSetting; })
-        .map(function(sobject) { return sobject.name; });
+      let describe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
+      let customSettings = describe.sobjects
+        .filter(sobject => sobject.customSetting)
+        .map(sobject => sobject.name);
 
       if (verbose) {
         console.log("- Options available for includeObjects: " + JSON.stringify(customSettings));
         console.log("- Options available for excludeObjects: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
       }
 
-      var objects = common.includeObjects
+      let objects = common.includeObjects
         .concat(customSettings)
-        .filter(function(sobject) { return common.excludeObjects.indexOf(sobject) == -1; });
+        .filter(sobject => common.excludeObjects.indexOf(sobject) == -1);
 
-      var results = objects.map(function(object) {
+      let results = objects.map(common.async(function*(object) {
         console.log("DescribeSObject " + object);
-        return conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
-          .then(function(objectDescribe) {
-            let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
-            console.log("Query " + object);
-            return conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
-          })
-          .then(function(data) {
-            let records = data.records;
-            for (var i = 0; i < records.length; i++) {
-              delete records[i].attributes;
-            }
-            return writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
-          });
-      });
+        let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
+        let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
+        console.log("Query " + object);
+        let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
+        let records = data.records;
+        for (let record of records) {
+          delete record.attributes;
+        }
+        yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
+      }));
       return Promise.all(results);
-    })
-    .then(null, function(err) { console.error(err); });
+    })();
 
-  function groupByThree(list) {
-    var groups = [];
-    list.forEach(function(element) {
-      if (groups.length == 0 || groups[groups.length - 1].length == 3) {
-        groups.push([]);
+    function groupByThree(list) {
+      let groups = [];
+      for (let element of list) {
+        if (groups.length == 0 || groups[groups.length - 1].length == 3) {
+          groups.push([]);
+        }
+        groups[groups.length - 1].push(element);
       }
-      groups[groups.length - 1].push(element);
-    });
-    return groups;
-  }
+      return groups;
+    }
 
-  login
-    .then(function() {
+    let metadataPromise = common.async(function*() {
       console.log("DescribeMetadata");
-      return conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
-    })
-    .then(function(res) {
-      var folderMap = {};
-      var x1 = res.metadataObjects
-        .filter(function(metadataObject) { return metadataObject.xmlName != "InstalledPackage"; });
+      let res = yield conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
+      let folderMap = {};
+      let x1 = res.metadataObjects
+        .filter(metadataObject => metadataObject.xmlName != "InstalledPackage");
       if (verbose) {
         console.log("- Options available for excludeDirs: " + JSON.stringify(x1.map(metadataObject => metadataObject.directoryName)));
       }
-      var x = x1
-        .filter(function(metadataObject) {
+      let x = x1
+        .filter(metadataObject => {
           if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
             console.log("(Excluding " + metadataObject.directoryName + ")");
             return false;
           }
           return true;
         })
-        .map(function(metadataObject) {
-          var xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
-          return xmlNames.map(function(xmlName) {
+        .map(metadataObject => {
+          let xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
+          return xmlNames.map(xmlName => {
             if (metadataObject.inFolder == "true") {
               if (xmlName == "EmailTemplate") {
                 folderMap["EmailFolder"] = "EmailTemplate";
@@ -122,33 +109,26 @@ module.exports.retrieve = function(cliArgs) {
             return xmlName;
           });
         });
-      return Promise.all(groupByThree(flattenArray(x)).map(function(xmlNames) {
+      res = yield Promise.all(groupByThree(flattenArray(x)).map(common.async(function*(xmlNames) {
         console.log("ListMetadata " + xmlNames.join(", "));
-        return conn.metadata(common.apiVersion, "listMetadata", {queries: xmlNames.map(function(xmlName) { return {type: xmlName}; })})
-          .then(asArray)
-          .then(function(someItems) {
-            var folders = someItems.filter(function(folder) { return folderMap[folder.type]});
-            var nonFolders = someItems.filter(function(folder) { return !folderMap[folder.type]});
-            return Promise
-              .all(groupByThree(folders).map(function(folderGroup) {
-                console.log("ListMetadata " + folderGroup.map(function(folder) { return folderMap[folder.type] + "/" + folder.fullName; }).join(", "));
-                return conn.metadata(common.apiVersion, "listMetadata", {queries: folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })}).then(asArray);
-              }))
-              .then(function(p) {
-                return flattenArray(p).concat(
-                  folders.map(function(folder) { return {type: folderMap[folder.type], fullName: folder.fullName}; }),
-                  nonFolders,
-                  xmlNames.map(function(xmlName) { return {type: xmlName, fullName: '*'}; })
-                );
-              });
-          });
-      }));
-    })
-    .then(function (res) {
-      var types = flattenArray(res);
-      types.sort(function(a, b) {
-        var ka = a.type + "~" + a.fullName;
-        var kb = b.type + "~" + b.fullName;
+        let someItems = asArray(yield conn.metadata(common.apiVersion, "listMetadata", {queries: xmlNames.map(xmlName => ({type: xmlName}))}));
+        let folders = someItems.filter(folder => folderMap[folder.type]);
+        let nonFolders = someItems.filter(folder => !folderMap[folder.type]);
+        let p = yield Promise
+          .all(groupByThree(folders).map(common.async(function*(folderGroup) {
+            console.log("ListMetadata " + folderGroup.map(folder => folderMap[folder.type] + "/" + folder.fullName).join(", "));
+            return asArray(yield conn.metadata(common.apiVersion, "listMetadata", {queries: folderGroup.map(folder => ({type: folderMap[folder.type], folder: folder.fullName}))}));
+          })));
+        return flattenArray(p).concat(
+          folders.map(folder => ({type: folderMap[folder.type], fullName: folder.fullName})),
+          nonFolders,
+          xmlNames.map(xmlName => ({type: xmlName, fullName: '*'}))
+        );
+      })));
+      let types = flattenArray(res);
+      types.sort((a, b) => {
+        let ka = a.type + "~" + a.fullName;
+        let kb = b.type + "~" + b.fullName;
         if (ka < kb) {
           return -1;
         }
@@ -157,56 +137,54 @@ module.exports.retrieve = function(cliArgs) {
         }
         return 0;
       });
-      types = types.map(function(x) { return {name: x.type, members: decodeURIComponent(x.fullName)}; });
+      types = types.map(x => ({name: x.type, members: decodeURIComponent(x.fullName)}));
       //console.log(types);
-      function retrieve() {
+      let retrieve = common.async(function*() {
         console.log("Retrieve");
-        return conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}}).then(function(result) {
-          console.log({id: result.id});
-          return common.complete(function() {
-            console.log("CheckRetrieveStatus");
-            return conn.metadata(common.apiVersion, "checkRetrieveStatus", {id: result.id});
-          }, function(result) { return result.done !== "false"; });
-        }).then(function(res) {
-          if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {
-            // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
-            console.error(res);
-            return retrieve();
-          }
-          return res;
+        let result = yield conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}})
+        console.log({id: result.id});
+        let res = yield common.complete(() => {
+          console.log("CheckRetrieveStatus");
+          return conn.metadata(common.apiVersion, "checkRetrieveStatus", {id: result.id});
         });
-      }
-      return retrieve();
-    })
-    .then(function(res) {
+        if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {
+          // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
+          console.error(res);
+          return yield retrieve();
+        }
+        return res;
+      });
+      res = yield retrieve();
       if (res.success != "true") {
         throw res;
       }
       console.log("(Reading response and writing files)");
       // We wait until the old files are removed before we create the new
-      return common.nfcall(rimraf, "src/").then(function() { return res; });
-    })
-    .then(function(res) {
-      var files = [];
+      yield common.nfcall(rimraf, "src/");
+      let files = [];
 
       files.push(writeFile("status.json", JSON.stringify({
         fileProperties: asArray(res.fileProperties)
-          .filter(function(fp) { return fp.id != "000000000000000AAA" || fp.fullName != ""; })
-          .sort(function(fp1, fp2) { return fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0 }),
+          .filter(fp => fp.id != "000000000000000AAA" || fp.fullName != "")
+          .sort((fp1, fp2) => fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0),
         messages: res.messages
       }, null, "    ")));
 
-      var zip = new JSZip(new Buffer(res.zipFile, "base64"));
-      for (var p in zip.files) {
-        var file = zip.files[p];
+      let zip = new JSZip(new Buffer(res.zipFile, "base64"));
+      for (let p in zip.files) {
+        let file = zip.files[p];
         if (!file.options.dir) {
-          var name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
+          let name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
           files.push(writeFile(name, file.asNodeBuffer()));
         }
       }
       console.log({messages: res.messages, status: res.status});
-      return Promise.all(files);
-    })
-    .then(null, function(err) { console.error(err); });
-
-}
+      yield Promise.all(files);
+    })();
+    yield dataPromise;
+    yield metadataPromise;
+  } catch (e) {
+    process.exitCode = 1;
+    console.error(e);
+  }
+});

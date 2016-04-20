@@ -1,67 +1,79 @@
 "use strict";
-var fs = require("graceful-fs");
-var url = require("url");
-var salesforce = require("./salesforce");
+let fs = require("graceful-fs");
+let url = require("url");
+let salesforce = require("./salesforce");
 
-module.exports.login = function(options) {
-  var pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
-  if (options.verbose) {
-    console.log("- Looking for password in file: " + pwfileName );
-  }
-  return Promise
-    .all([
-      module.exports.nfcall(fs.readFile, "forcecmd.json", "utf-8"),
-      module.exports.nfcall(fs.readFile, pwfileName, "utf-8")
-    ])
-    .then(function(files) {
-      var file = files[0];
-      var pwfile = files[1];
-      var config = JSON.parse(file);
-      module.exports.apiVersion = config.apiVersion;
-      module.exports.excludeDirs = config.excludeDirs || [];
-      module.exports.includeObjects = config.includeObjects || [];
-      module.exports.excludeObjects = config.excludeObjects || [];
-      var pwKey = config.loginUrl + "$" + config.username;
-      if (options.verbose) {
-        console.log("- Looking for password with key: " + pwKey);
+module.exports.async = function(generator) {
+  return function() {
+    let iterator = generator.apply(this, arguments);
+    return new Promise((resolve, reject) => {
+      function await(step) {
+        if (step.done) {
+          resolve(step.value);
+          return;
+        }
+        Promise.resolve(step.value).then(iterator.next.bind(iterator), iterator.throw.bind(iterator)).then(await, reject);
       }
-      var password = JSON.parse(pwfile).passwords[pwKey];
-      if (!config.loginUrl) throw "Missing loginUrl";
-      if (!config.username) throw "Missing username";
-      if (!password) throw "Missing password";
-      if (!config.apiVersion) throw "Missing apiVersion";
-      let loginUrl = url.parse(config.loginUrl);
-      if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
-      if (loginUrl.port) throw "loginUrl must use the default port";
-      console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
-      let sfConn = new salesforce();
-      return sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password}).then(() => sfConn);
+      await(iterator.next());
     });
+  };
 }
 
-module.exports.asArray = salesforce.asArray;
-
-module.exports.complete = function complete(doCheck, isDone) {
-  return new Promise(function(resolve, reject) {
-    var interval = 1000;
-    var poll = function() {
-      doCheck().then(function(result) {
-        if (isDone(result)) {
-          resolve(result);
-        } else {
-          interval *= 1.3;
-          setTimeout(poll, interval);
-        }
-      }, function(err) {
-        reject(err);
-      });
-    };
-    setTimeout(poll, interval);
+module.exports.timeout = function(ms) {
+  return new Promise((resolve, reject) => {
+    setTimeout(resolve, ms);
   });
 }
 
+module.exports.login = module.exports.async(function*(options) {
+  let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
+  if (options.verbose) {
+    console.log("- Looking for password in file: " + pwfileName );
+  }
+  let filePromise = module.exports.nfcall(fs.readFile, "forcecmd.json", "utf-8");
+  let pwfilePromise = module.exports.nfcall(fs.readFile, pwfileName, "utf-8");
+  let file = yield filePromise;
+  let pwfile = yield pwfilePromise;
+  let config = JSON.parse(file);
+  module.exports.apiVersion = config.apiVersion;
+  module.exports.excludeDirs = config.excludeDirs || [];
+  module.exports.includeObjects = config.includeObjects || [];
+  module.exports.excludeObjects = config.excludeObjects || [];
+  let pwKey = config.loginUrl + "$" + config.username;
+  if (options.verbose) {
+    console.log("- Looking for password with key: " + pwKey);
+  }
+  let password = JSON.parse(pwfile).passwords[pwKey];
+  if (!config.loginUrl) throw "Missing loginUrl";
+  if (!config.username) throw "Missing username";
+  if (!password) throw "Missing password";
+  if (!config.apiVersion) throw "Missing apiVersion";
+  let loginUrl = url.parse(config.loginUrl);
+  if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
+  if (loginUrl.port) throw "loginUrl must use the default port";
+  console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
+  let sfConn = new salesforce();
+  yield sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
+  return sfConn;
+});
+
+module.exports.asArray = salesforce.asArray;
+
+module.exports.complete = module.exports.async(function*(doCheck) {
+  let interval = 1000;
+  yield module.exports.timeout(interval);
+  while (true) {
+    let result = yield doCheck()
+    if (result.done !== "false") {
+      return result;
+    }
+    interval *= 1.3;
+    yield module.exports.timeout(interval);
+  }
+});
+
 module.exports.nfcall = function nfapply(fn) {
-  var args = Array.prototype.slice.call(arguments, 1);
+  let args = Array.prototype.slice.call(arguments, 1);
   return new Promise(function(resolve, reject) {
     try {
       function nodeResolver(error, value) {
@@ -75,7 +87,7 @@ module.exports.nfcall = function nfapply(fn) {
       }
       args.push(nodeResolver);
       fn.apply(undefined, args);
-    } catch(e) {
+    } catch (e) {
       reject(e);
     }
   });
