@@ -23,11 +23,15 @@ let xml = {
   }
 };
 
-module.exports.login = function() {
+module.exports.login = function(options) {
+  var pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
+  if (options.verbose) {
+    console.log("- Looking for password in file: " + pwfileName );
+  }
   return Promise
     .all([
       module.exports.nfcall(fs.readFile, "forcecmd.json", "utf-8"),
-      module.exports.nfcall(fs.readFile, (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json", "utf-8")
+      module.exports.nfcall(fs.readFile, pwfileName, "utf-8")
     ])
     .then(function(files) {
       var file = files[0];
@@ -37,7 +41,11 @@ module.exports.login = function() {
       module.exports.excludeDirs = config.excludeDirs || [];
       module.exports.includeObjects = config.includeObjects || [];
       module.exports.excludeObjects = config.excludeObjects || [];
-      var password = JSON.parse(pwfile).passwords[config.loginUrl + "$" + config.username];
+      var pwKey = config.loginUrl + "$" + config.username;
+      if (options.verbose) {
+        console.log("- Looking for password with key: " + pwKey);
+      }
+      var password = JSON.parse(pwfile).passwords[pwKey];
       if (!config.loginUrl) throw "Missing loginUrl";
       if (!config.username) throw "Missing username";
       if (!password) throw "Missing password";

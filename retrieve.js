@@ -1,10 +1,14 @@
 "use strict";
 var fs = require("graceful-fs");
-var rimraf = require('rimraf')
+var rimraf = require('rimraf');
 var JSZip = require("jszip");
 var common = require("./common");
 
-module.exports.retrieve = function() {
+module.exports.retrieve = function(cliArgs) {
+  var verbose = cliArgs.indexOf("--verbose") > -1;
+  if (cliArgs.some(function(a) { return a != "--verbose"; })) {
+    throw "unknown argument";
+  }
   var asArray = common.asArray;
 
   function flattenArray(x) {
@@ -27,7 +31,7 @@ module.exports.retrieve = function() {
     return p.then(function() { return common.nfcall(fs.writeFile, path, data); });
   }
 
-  var login = common.login();
+  var login = common.login({verbose});
 
   login
     .then(function() {
@@ -38,6 +42,11 @@ module.exports.retrieve = function() {
       var customSettings = describe.sobjects
         .filter(function(sobject) { return sobject.customSetting; })
         .map(function(sobject) { return sobject.name; });
+
+      if (verbose) {
+        console.log("- Options available for includeObjects: " + JSON.stringify(customSettings));
+        console.log("- Options available for excludeObjects: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
+      }
 
       var objects = common.includeObjects
         .concat(customSettings)
@@ -81,8 +90,12 @@ module.exports.retrieve = function() {
     })
     .then(function(res) {
       var folderMap = {};
-      var x = res.metadataObjects
-        .filter(function(metadataObject) { return metadataObject.xmlName != "InstalledPackage"; })
+      var x1 = res.metadataObjects
+        .filter(function(metadataObject) { return metadataObject.xmlName != "InstalledPackage"; });
+      if (verbose) {
+        console.log("- Options available for excludeDirs: " + JSON.stringify(x1.map(metadataObject => metadataObject.directoryName)));
+      }
+      var x = x1
         .filter(function(metadataObject) {
           if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
             console.log("(Excluding " + metadataObject.directoryName + ")");

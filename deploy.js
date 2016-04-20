@@ -54,7 +54,7 @@ module.exports.deploy = function(cliArgs) {
 
   Promise
     .all([
-      common.login()
+      common.login({verbose: false})
         .then(function(c) {
           console.log("Describe");
           return common.askSalesforceMetadata("describeMetadata", {apiVersion: common.apiVersion});
