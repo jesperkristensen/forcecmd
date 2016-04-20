@@ -52,12 +52,15 @@ module.exports.deploy = function(cliArgs) {
       });
   }
 
+  var conn;
+
   Promise
     .all([
       common.login({verbose: false})
         .then(function(c) {
+          conn = c;
           console.log("Describe");
-          return common.askSalesforceMetadata("describeMetadata", {apiVersion: common.apiVersion});
+          return conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
         }),
       destroy ? null : readAllFiles()
     ])
@@ -143,13 +146,13 @@ module.exports.deploy = function(cliArgs) {
     })
     .then(function(zipFile) {
       console.log("Deploy");
-      return common.askSalesforceMetadata("deploy", {zipFile, deployOptions});
+      return conn.metadata(common.apiVersion, "deploy", {zipFile, deployOptions});
     })
     .then(function(result) {
       console.log({id: result.id});
       return common.complete(function() {
         console.log("CheckDeployStatus");
-        return common.askSalesforceMetadata("checkDeployStatus", {id: result.id, includeDetails: true});
+        return conn.metadata(common.apiVersion, "checkDeployStatus", {id: result.id, includeDetails: true});
       }, function(result) { return result.done !== "false"; });
     })
     .then(function(res) {

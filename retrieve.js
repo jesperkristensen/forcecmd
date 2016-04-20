@@ -31,12 +31,16 @@ module.exports.retrieve = function(cliArgs) {
     return p.then(function() { return common.nfcall(fs.writeFile, path, data); });
   }
 
-  var login = common.login({verbose});
+  var conn;
+  var login = common.login({verbose})
+    .then(function(c) {
+      conn = c;
+    });
 
   login
     .then(function() {
       console.log("DescribeGlobal");
-      return common.askSalesforce("/services/data/v" + common.apiVersion + "/sobjects");
+      return conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
     })
     .then(function(describe) {
       var customSettings = describe.sobjects
@@ -54,11 +58,11 @@ module.exports.retrieve = function(cliArgs) {
 
       var results = objects.map(function(object) {
         console.log("DescribeSObject " + object);
-        return common.askSalesforce("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
+        return conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
           .then(function(objectDescribe) {
             let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
             console.log("Query " + object);
-            return common.askSalesforce("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
+            return conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
           })
           .then(function(data) {
             let records = data.records;
@@ -86,7 +90,7 @@ module.exports.retrieve = function(cliArgs) {
   login
     .then(function() {
       console.log("DescribeMetadata");
-      return common.askSalesforceMetadata("describeMetadata", {apiVersion: common.apiVersion});
+      return conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
     })
     .then(function(res) {
       var folderMap = {};
@@ -120,7 +124,7 @@ module.exports.retrieve = function(cliArgs) {
         });
       return Promise.all(groupByThree(flattenArray(x)).map(function(xmlNames) {
         console.log("ListMetadata " + xmlNames.join(", "));
-        return common.askSalesforceMetadata("listMetadata", {queries: xmlNames.map(function(xmlName) { return {type: xmlName}; })})
+        return conn.metadata(common.apiVersion, "listMetadata", {queries: xmlNames.map(function(xmlName) { return {type: xmlName}; })})
           .then(asArray)
           .then(function(someItems) {
             var folders = someItems.filter(function(folder) { return folderMap[folder.type]});
@@ -128,7 +132,7 @@ module.exports.retrieve = function(cliArgs) {
             return Promise
               .all(groupByThree(folders).map(function(folderGroup) {
                 console.log("ListMetadata " + folderGroup.map(function(folder) { return folderMap[folder.type] + "/" + folder.fullName; }).join(", "));
-                return common.askSalesforceMetadata("listMetadata", {queries: folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })}).then(asArray);
+                return conn.metadata(common.apiVersion, "listMetadata", {queries: folderGroup.map(function(folder) { return {type: folderMap[folder.type], folder: folder.fullName}; })}).then(asArray);
               }))
               .then(function(p) {
                 return flattenArray(p).concat(
@@ -157,11 +161,11 @@ module.exports.retrieve = function(cliArgs) {
       //console.log(types);
       function retrieve() {
         console.log("Retrieve");
-        return common.askSalesforceMetadata("retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}}).then(function(result) {
+        return conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}}).then(function(result) {
           console.log({id: result.id});
           return common.complete(function() {
             console.log("CheckRetrieveStatus");
-            return common.askSalesforceMetadata("checkRetrieveStatus", {id: result.id});
+            return conn.metadata(common.apiVersion, "checkRetrieveStatus", {id: result.id});
           }, function(result) { return result.done !== "false"; });
         }).then(function(res) {
           if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {

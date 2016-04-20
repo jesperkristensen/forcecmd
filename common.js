@@ -3,8 +3,6 @@ var fs = require("graceful-fs");
 var url = require("url");
 var salesforce = require("./salesforce");
 
-let sfConn = new salesforce();
-
 module.exports.login = function(options) {
   var pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
   if (options.verbose) {
@@ -36,16 +34,9 @@ module.exports.login = function(options) {
       if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
       if (loginUrl.port) throw "loginUrl must use the default port";
       console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
-      return sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
+      let sfConn = new salesforce();
+      return sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password}).then(() => sfConn);
     });
-}
-
-module.exports.askSalesforce = function(url, options) {
-  return sfConn.rest(url, options);
-}
-
-module.exports.askSalesforceMetadata = function(method, body) {
-  return sfConn.metadata(module.exports.apiVersion, method, body);
 }
 
 module.exports.asArray = salesforce.asArray;
