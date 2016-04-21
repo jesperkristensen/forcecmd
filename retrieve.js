@@ -38,39 +38,57 @@ module.exports.retrieve = common.async(function*(cliArgs) {
     let dataPromise = common.async(function*() {
       console.log("DescribeGlobal");
       let describe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
-      let customSettings = describe.sobjects
-        .filter(sobject => sobject.customSetting)
-        .map(sobject => sobject.name);
 
       if (verbose) {
-        console.log("- Options available for includeObjects: " + JSON.stringify(customSettings));
-        console.log("- Options available for excludeObjects: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
+        console.log("- Objects included by default: " + JSON.stringify(describe.sobjects.filter(sobject => sobject.customSetting).map(sobject => sobject.name)));
+        console.log("- Objects not included by default: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
       }
 
-      let objects = common.includeObjects
-        .concat(customSettings)
-        .filter(sobject => common.excludeObjects.indexOf(sobject) == -1);
-
-      let results = objects.map(common.async(function*(object) {
-        console.log("DescribeSObject " + object);
-        let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
-        let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
-        console.log("Query " + object);
-        let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
-        let records = [];
-        while (true) {
-          for (let record of data.records) {
-            delete record.attributes;
-          }
-          records = records.concat(data.records);
-          if (!data.nextRecordsUrl) {
-            break;
-          }
-          console.log("QueryMore " + object);
-          data = yield conn.rest(data.nextRecordsUrl);
+      let objects = common.objects;
+      for (let sobject of describe.sobjects) {
+        if (sobject.customSetting && !(sobject.name in objects)) {
+          objects[sobject.name] = true;
         }
-        yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
-      }));
+      }
+
+      let results = [];
+      for (let object in objects) {
+        results.push(common.async(function*() {
+          let soql = objects[object];
+          if (soql === false) {
+            return;
+          }
+          if (soql instanceof Array) {
+            soql = "select " + soql.join(", ") + " from " + object
+          }
+          if (soql === true) {
+            console.log("DescribeSObject " + object);
+            let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
+            soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
+          }
+          if (typeof soql != "string") {
+            throw "Cannot understand configuration of object: " + object;
+          }
+          if (verbose) {
+            console.log("- Using " + object + " SOQL: " + soql);
+          }
+          console.log("Query " + object);
+          let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
+          let records = [];
+          while (true) {
+            for (let record of data.records) {
+              delete record.attributes;
+            }
+            records = records.concat(data.records);
+            if (!data.nextRecordsUrl) {
+              break;
+            }
+            console.log("QueryMore " + object);
+            data = yield conn.rest(data.nextRecordsUrl);
+          }
+          yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
+        })());
+      }
       return Promise.all(results);
     })();
 

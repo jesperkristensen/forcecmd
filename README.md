@@ -43,8 +43,12 @@ All metadata and all custom settings are downloaded by default. You can customiz
       "loginUrl": "https://login.salesforce.com/",
       "username": "yourname@yourcompany.com",
       "excludeDirs": ["documents"],
-      "excludeObjects": ["MyCustomSetting__c"],
-      "includeObjects": ["Product2", "Pricebook2"]
+      "objects": {
+        "MyCustomSetting__c": false,
+        "Product2": true,
+        "Pricebook2": ["Id", "Name", "IsActive"],
+        "PricebookEntry": "select Product2Id, Pricebook2Id, UnitPrice from PricebookEntry where IsActive = true"
+      }
     }
 
 Use `forcecmd retrieve --verbose` to see what values are available to customize, or to debug issues finding the right password.

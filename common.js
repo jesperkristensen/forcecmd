@@ -37,8 +37,9 @@ module.exports.login = module.exports.async(function*(options) {
   let config = JSON.parse(file);
   module.exports.apiVersion = config.apiVersion;
   module.exports.excludeDirs = config.excludeDirs || [];
-  module.exports.includeObjects = config.includeObjects || [];
-  module.exports.excludeObjects = config.excludeObjects || [];
+  module.exports.objects = config.objects || {};
+  if (config.includeObjects) throw "includeObjects is obsolete";
+  if (config.excludeObjects) throw "excludeObjects is obsolete";
   let pwKey = config.loginUrl + "$" + config.username;
   if (options.verbose) {
     console.log("- Looking for password with key: " + pwKey);
