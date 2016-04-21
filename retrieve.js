@@ -57,9 +57,17 @@ module.exports.retrieve = common.async(function*(cliArgs) {
         let soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
         console.log("Query " + object);
         let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
-        let records = data.records;
-        for (let record of records) {
-          delete record.attributes;
+        let records = [];
+        while (true) {
+          for (let record of data.records) {
+            delete record.attributes;
+          }
+          records = records.concat(data.records);
+          if (!data.nextRecordsUrl) {
+            break;
+          }
+          console.log("QueryMore " + object);
+          data = yield conn.rest(data.nextRecordsUrl);
         }
         yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
       }));
