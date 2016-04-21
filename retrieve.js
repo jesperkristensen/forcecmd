@@ -4,38 +4,39 @@ let rimraf = require('rimraf');
 let JSZip = require("jszip");
 let common = require("./common");
 
-module.exports.retrieve = common.async(function*(cliArgs) {
-  try {
-    let verbose = cliArgs.indexOf("--verbose") > -1;
-    if (cliArgs.some(a => a != "--verbose")) {
-      throw "unknown argument";
-    }
-    let asArray = common.asArray;
+module.exports.retrieve = function(cliArgs) {
+  let verbose = cliArgs.indexOf("--verbose") > -1;
+  if (cliArgs.some(a => a != "--verbose")) {
+    throw "unknown argument";
+  }
+  let asArray = common.asArray;
 
-    function flattenArray(x) {
-      return [].concat.apply([], x);
-    }
+  function flattenArray(x) {
+    return [].concat.apply([], x);
+  }
 
-    let writeFile = common.async(function*(path, data) {
-      let pos = -1;
-      while (true) {
-        pos = path.indexOf("/", pos + 1);
-        if (pos == -1) {
-          break;
-        }
-        let dir = path.substring(0, pos);
-        try {
-          yield common.nfcall(fs.mkdir, dir);
-        } catch (err) {
-          if (err.code != "EEXIST") throw err;
-        }
+  let writeFile = common.async(function*(path, data) {
+    let pos = -1;
+    while (true) {
+      pos = path.indexOf("/", pos + 1);
+      if (pos == -1) {
+        break;
       }
-      yield common.nfcall(fs.writeFile, path, data);
-    });
+      let dir = path.substring(0, pos);
+      try {
+        yield common.nfcall(fs.mkdir, dir);
+      } catch (err) {
+        if (err.code != "EEXIST") throw err;
+      }
+    }
+    yield common.nfcall(fs.writeFile, path, data);
+  });
 
-    let conn = yield common.login({verbose});
+  let loginPromise = common.login({verbose});
 
-    let dataPromise = common.async(function*() {
+  common.async(function*() {
+    try {
+      let conn = yield loginPromise;
       console.log("DescribeGlobal");
       let describe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
 
@@ -89,21 +90,27 @@ module.exports.retrieve = common.async(function*(cliArgs) {
           yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
         })());
       }
-      return Promise.all(results);
-    })();
-
-    function groupByThree(list) {
-      let groups = [];
-      for (let element of list) {
-        if (groups.length == 0 || groups[groups.length - 1].length == 3) {
-          groups.push([]);
-        }
-        groups[groups.length - 1].push(element);
-      }
-      return groups;
+      yield Promise.all(results);
+    } catch (e) {
+      process.exitCode = 1;
+      console.error(e);
     }
+  })();
 
-    let metadataPromise = common.async(function*() {
+  function groupByThree(list) {
+    let groups = [];
+    for (let element of list) {
+      if (groups.length == 0 || groups[groups.length - 1].length == 3) {
+        groups.push([]);
+      }
+      groups[groups.length - 1].push(element);
+    }
+    return groups;
+  }
+
+  common.async(function*() {
+    try {
+      let conn = yield loginPromise;
       console.log("DescribeMetadata");
       let res = yield conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
       let folderMap = {};
@@ -206,11 +213,9 @@ module.exports.retrieve = common.async(function*(cliArgs) {
       }
       console.log({messages: res.messages, status: res.status});
       yield Promise.all(files);
-    })();
-    yield dataPromise;
-    yield metadataPromise;
-  } catch (e) {
-    process.exitCode = 1;
-    console.error(e);
-  }
-});
+    } catch (e) {
+      process.exitCode = 1;
+      console.error(e);
+    }
+  })();
+};
