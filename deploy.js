@@ -127,7 +127,7 @@ module.exports.deploy = common.async(function*(cliArgs) {
     if (destroy) {
       let destructiveChangesXml = new xmldom.XMLSerializer().serializeToString(doc);
       console.log(destructiveChangesXml);
-      zip.file("unpackaged/destructiveChanges.xml", destructiveChangesXml);
+      zip.file("unpackaged/destructiveChanges.xml", Buffer.from(destructiveChangesXml, "utf8"));
 
       doc = xmldom.DOMImplementation.prototype.createDocument("http://soap.sforce.com/2006/04/metadata", "Package");
       doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
@@ -136,9 +136,21 @@ module.exports.deploy = common.async(function*(cliArgs) {
     doc.documentElement.appendChild(T("version", common.apiVersion));
     let packageXml = new xmldom.XMLSerializer().serializeToString(doc);
     console.log(packageXml);
-    zip.file("unpackaged/package.xml", packageXml);
+    zip.file("unpackaged/package.xml", Buffer.from(packageXml, "utf8"));
 
-    let zipFile = yield zip.generate({type: "base64"});
+    // JSZip#generate supports a number of data types with different performance.
+    // The type argument to the generate method:
+    //    "string" is quite ineficcient. It will involve a fair amount of data copying, and data take twice the required space.
+    //    "base64" is very inefficient. Same ineficciency as "string", plus it does not use the Base64 encoder built into Node. The custom Base64 encoder will cause Node to run out of memory on normally sized orgs.
+    //    "uint8array", "arraybuffer", "nodebuffer" and "blob" are efficient. "uint8array" is the most efficient, since that is the internal format used by JSZip.
+    // The type of each file in the zip, assuming the generate method is called with the type argument set to one of the binary types:
+    //    A Node Buffer will be converted to a Uint8Array by naively copying each byte.
+    //    An ArrayBuffer will be converted to a Uint8Array by reading its .buffer property.
+    //    Uint8Array will be used directly.
+    // We let JSZip convert input files from Buffer to Uint8Array since we cannot do it better ourselves.
+    // We use the Base64 encoder built into the Buffer object, since the Base64 encoder in JSZip is not performant enough.
+    // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used when passing "nodebuffer" to JSZip, but the difference is probably tiny.
+    let zipFile = Buffer.from(zip.generate({type: "arraybuffer"})).toString("base64");
     console.log("Deploy");
     let result = yield conn.metadata(common.apiVersion, "deploy", {zipFile, deployOptions});
     console.log({id: result.id});

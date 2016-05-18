@@ -203,12 +203,19 @@ module.exports.retrieve = function(cliArgs) {
         messages: res.messages
       }, null, "    ")));
 
-      let zip = new JSZip(new Buffer(res.zipFile, "base64"));
+      // JSZip does not use the Base64 encoder built into Node. The custom Base64 encoder will cause Node to run out of memory on normally sized orgs.
+      // JSZip will convert all input types to Uint8Array if they are deflate compressed (which they are).
+      // If the input is a Node Buffer, JSZip will split it up into individual files and then convert each file to a Uint8Array.
+      // For all other types, JSZip will first convert the whole zip file into a Uint8Array.
+      // Here we convert the input to a Buffer before giving it to JSZip, to avoid the inefficient base64 decoding in JSZip.
+      // We let JSZip convert the Buffer to a Uint8Array since we cannot do that more efficiently than JSZip does.
+      let zip = new JSZip(Buffer.from(res.zipFile, "base64"));
       for (let p in zip.files) {
         let file = zip.files[p];
         if (!file.options.dir) {
           let name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
-          files.push(writeFile(name, file.asNodeBuffer()));
+          // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used by file.asNodeBuffer(), but the difference is probably tiny.
+          files.push(writeFile(name, Buffer.from(file.asArrayBuffer())));
         }
       }
       console.log({messages: res.messages, status: res.status});
