@@ -108,11 +108,55 @@ module.exports.prototype = {
     });
   },
 
+  enterprise(apiVersion, method, body) {
+    return this._soap({
+      host: this.instanceHostname,
+      path: "/services/Soap/c/" + apiVersion,
+      namespace: "urn:enterprise.soap.sforce.com",
+      header: {SessionHeader: {sessionId: this.sessionId}},
+      method,
+      body
+    });
+  },
+
+  partner(apiVersion, method, body) {
+    return this._soap({
+      host: this.instanceHostname,
+      path: "/services/Soap/u/" + apiVersion,
+      namespace: "urn:partner.soap.sforce.com",
+      header: {SessionHeader: {sessionId: this.sessionId}},
+      method,
+      body
+    });
+  },
+
+  apex(apiVersion, method, body) {
+    return this._soap({
+      host: this.instanceHostname,
+      path: "/services/Soap/s/" + apiVersion,
+      namespace: "http://soap.sforce.com/2006/08/apex",
+      header: {SessionHeader: {sessionId: this.sessionId}},
+      method,
+      body
+    });
+  },
+
   metadata(apiVersion, method, body) {
     return this._soap({
       host: this.instanceHostname,
       path: "/services/Soap/m/" + apiVersion,
       namespace: "http://soap.sforce.com/2006/04/metadata",
+      header: {SessionHeader: {sessionId: this.sessionId}},
+      method,
+      body
+    });
+  },
+
+  tooling(apiVersion, method, body) {
+    return this._soap({
+      host: this.instanceHostname,
+      path: "/services/Soap/T/" + apiVersion,
+      namespace: "urn:tooling.soap.sforce.com",
       header: {SessionHeader: {sessionId: this.sessionId}},
       method,
       body
