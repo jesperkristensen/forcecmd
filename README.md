@@ -10,7 +10,7 @@ and work around some bugs and limitations in the metadata API.
 
 1. Install Node.js from http://nodejs.org/.
 2. Open a command prompt. (Tested in MinGW)
-3. Run `npm install -g jesperkristensen/forcecmd`.
+3. Run `npm install --global jesperkristensen/forcecmd`.
 
 ## Set up an org
 
