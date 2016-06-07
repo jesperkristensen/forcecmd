@@ -54,6 +54,19 @@ module.exports.login = module.exports.async(function*(options) {
   if (loginUrl.port) throw "loginUrl must use the default port";
   console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
   let sfConn = new salesforce();
+  let oldRequest = sfConn._request;
+  sfConn._request = function() {
+    let doRequest = retries => {
+      return oldRequest.apply(this, arguments).catch(err => {
+        if (err && err.networkError && err.networkError.errno == "ETIMEDOUT" && err.networkError.syscall == "connect" && retries > 0) {
+          console.log("(Got connect ETIMEDOUT, retrying)");
+          return doRequest(retries - 1);
+        }
+        throw err;
+      });
+    }
+    return doRequest(10);
+  }
   yield sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
   return sfConn;
 });
