@@ -215,7 +215,8 @@ module.exports.retrieve = function(cliArgs) {
         if (!file.options.dir) {
           let name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
           // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used by file.asNodeBuffer(), but the difference is probably tiny.
-          files.push(writeFile(name, Buffer.from(file.asArrayBuffer())));
+          let arrBuf = file.asArrayBuffer();
+          files.push(writeFile(name, arrBuf.byteLength == 0 ? Buffer.alloc(0) : Buffer.from(arrBuf)));
         }
       }
       console.log({messages: res.messages, status: res.status});
