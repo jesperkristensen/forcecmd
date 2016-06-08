@@ -1,6 +1,5 @@
 "use strict";
 let fs = require("graceful-fs");
-let rimraf = require('rimraf');
 let JSZip = require("jszip");
 let common = require("./common");
 
@@ -192,8 +191,24 @@ module.exports.retrieve = function(cliArgs) {
         throw res;
       }
       console.log("(Reading response and writing files)");
+      let fsRemove = common.async(function*(path) {
+        try {
+          yield common.nfcall(fs.unlink, path);
+        } catch (ex) {
+          if (ex.code == "ENOENT") {
+            // File does not exist
+            return;
+          }
+          if (ex.code == "EPERM") {
+            // Was not a file. Assume it was a directory
+            let files = yield common.nfcall(fs.readdir, path);
+            yield Promise.all(files.map(file => fsRemove(path + "/" + file)));
+            yield common.nfcall(fs.rmdir, path);
+          }
+        }
+      });
+      yield fsRemove("src");
       // We wait until the old files are removed before we create the new
-      yield common.nfcall(rimraf, "src/");
       let files = [];
 
       files.push(writeFile("status.json", JSON.stringify({
