@@ -179,7 +179,7 @@ module.exports.retrieve = function(cliArgs) {
           console.log("CheckRetrieveStatus");
           return conn.metadata(common.apiVersion, "checkRetrieveStatus", {id: result.id});
         });
-        if (res.errorStatusCode == "UNKNOWN_EXCEPTION") {
+        if (res.errorStatusCode == "UNKNOWN_EXCEPTION" && typeof res.errorMessage == "string" && res.errorMessage.includes("Please include this ErrorId if you contact support")) {
           // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
           console.error(res);
           return yield retrieve();
