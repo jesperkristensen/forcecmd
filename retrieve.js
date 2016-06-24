@@ -5,7 +5,8 @@ let common = require("./common");
 
 module.exports.retrieve = function(cliArgs) {
   let verbose = cliArgs.indexOf("--verbose") > -1;
-  if (cliArgs.some(a => a != "--verbose")) {
+  let netlog = cliArgs.indexOf("--netlog") > -1;
+  if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
     throw "unknown argument";
   }
   let asArray = common.asArray;
@@ -31,7 +32,7 @@ module.exports.retrieve = function(cliArgs) {
     yield common.nfcall(fs.writeFile, path, data);
   });
 
-  let loginPromise = common.login({verbose});
+  let loginPromise = common.login({verbose, netlog});
 
   common.async(function*() {
     try {

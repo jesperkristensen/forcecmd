@@ -53,6 +53,8 @@ All metadata and all custom settings are downloaded by default. You can customiz
 
 Use `forcecmd retrieve --verbose` to see what values are available to customize, or to debug issues finding the right password.
 
+Use `forcecmd retrieve --netlog` to print every minute detail about all Salesforce API requests made.
+
 Upon completion the tool will typically print a number of messages from the Metadata API indicating problems. This is normal. If the status is Succeeded, you can ignore the messages.
 
 ## Deploy changes

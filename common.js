@@ -54,6 +54,24 @@ module.exports.login = module.exports.async(function*(options) {
   if (loginUrl.port) throw "loginUrl must use the default port";
   console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
   let sfConn = new salesforce();
+  if (options.netlog) {
+    let oldRequestNetlog = sfConn._request;
+    sfConn._request = function(httpsOptions, requestBody) {
+      return oldRequestNetlog.apply(this, arguments).then(res => {
+        console.log("request success");
+        console.log("request options:", httpsOptions);
+        console.log("request body:", requestBody);
+        console.log("response body:", res.responseBody);
+        return res;
+      }, err => {
+        console.log("request error");
+        console.log("request options:", httpsOptions);
+        console.log("request body:", requestBody);
+        console.log("response:", err);
+        throw err;
+      });
+    }
+  }
   let oldRequest = sfConn._request;
   sfConn._request = function() {
     let doRequest = retries => {
