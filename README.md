@@ -18,7 +18,7 @@ and work around some bugs and limitations in the metadata API.
 2. Create a new file in your org's directory named `forcecmd.json` with content like this:
 
         {
-          "apiVersion": "31.0",
+          "apiVersion": "38.0",
           "loginUrl": "https://login.salesforce.com/",
           "username": "yourname@yourcompany.com"
         }
@@ -39,7 +39,7 @@ and work around some bugs and limitations in the metadata API.
 All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
 
     {
-      "apiVersion": "31.0",
+      "apiVersion": "38.0",
       "loginUrl": "https://login.salesforce.com/",
       "username": "yourname@yourcompany.com",
       "excludeDirs": ["documents"],
