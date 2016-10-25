@@ -80,6 +80,10 @@ module.exports.login = module.exports.async(function*(options) {
           console.log("(Got connect ETIMEDOUT, retrying)");
           return doRequest(retries - 1);
         }
+        if (err && err.networkError && err.networkError.errno == "ECONNRESET" && err.networkError.syscall == "read" && retries > 0) {
+          console.log("(Got read ECONNRESET, retrying)");
+          return doRequest(retries - 1);
+        }
         throw err;
       });
     }
