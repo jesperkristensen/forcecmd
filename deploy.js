@@ -42,10 +42,10 @@ module.exports.deploy = common.async(function*(cliArgs) {
         .all(readFiles.map(common.async(function*(fileName) {
           try {
             let data = yield common.nfcall(fs.readFile, fileName);
-            return {fileName: fileName, data: data};
+            return {fileName, data};
           } catch (err) {
             if (err.code != "ENOENT") { throw err; }
-            return {fileName: fileName, data: null};
+            return {fileName, data: null};
           }
         })));
       let files = {};
@@ -71,22 +71,22 @@ module.exports.deploy = common.async(function*(cliArgs) {
     let zip = new JSZip();
     let doc = xmldom.DOMImplementation.prototype.createDocument("http://soap.sforce.com/2006/04/metadata", "Package");
     doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
-    function E(name, children) {
+    let el = (name, children) => {
       let e = doc.createElement(name);
       for (let child of children) {
         e.appendChild(child);
       }
       return e;
-    }
-    function T(name, text) {
+    };
+    let tx = (name, text) => {
       let e = doc.createElement(name);
       e.textContent = text;
       return e;
-    }
+    };
     for (let fileName of fileNames) {
       let fullName, zipFileName;
       if (fileName.substr(-1) == "/") { // It is a "Folder". It does not have a main metadata file, only the -meta.xml file.
-        let folderMetaName = fileName.substring(0, fileName.length - 1) + "-meta.xml"
+        let folderMetaName = fileName.substring(0, fileName.length - 1) + "-meta.xml";
         if (!destroy && files[folderMetaName] == null) {
           throw "File not found: " + fileName;
         }
@@ -104,7 +104,7 @@ module.exports.deploy = common.async(function*(cliArgs) {
         if (!destroy) {
           zip.file(zipFileName, files[fileName]);
           if (files[fileName + "-meta.xml"] != null) {
-            zip.file(zipFileName + "-meta.xml",  files[fileName + "-meta.xml"]);
+            zip.file(zipFileName + "-meta.xml", files[fileName + "-meta.xml"]);
           }
         }
 
@@ -117,9 +117,9 @@ module.exports.deploy = common.async(function*(cliArgs) {
       }
 
       doc.documentElement.appendChild(
-        E("types", [
-          T("members", fullName),
-          T("name", metadataObjectsByDir[typeDirName].xmlName)
+        el("types", [
+          tx("members", fullName),
+          tx("name", metadataObjectsByDir[typeDirName].xmlName)
         ])
       );
     }
@@ -133,7 +133,7 @@ module.exports.deploy = common.async(function*(cliArgs) {
       doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
     }
 
-    doc.documentElement.appendChild(T("version", common.apiVersion));
+    doc.documentElement.appendChild(tx("version", common.apiVersion));
     let packageXml = new xmldom.XMLSerializer().serializeToString(doc);
     console.log(packageXml);
     zip.file("unpackaged/package.xml", Buffer.from(packageXml, "utf8"));

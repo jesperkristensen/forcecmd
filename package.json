@@ -9,5 +9,11 @@
     "xmldom": "*",
     "graceful-fs": "*",
     "xml2js": "*"
+  },
+  "devDependencies": {
+    "eslint": "^3.11.0"
+  },
+  "scripts": {
+    "eslint": "eslint ."
   }
 }

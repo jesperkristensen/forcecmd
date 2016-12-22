@@ -1,11 +1,11 @@
 "use strict";
 let fs = require("graceful-fs");
 let url = require("url");
-let salesforce = require("./salesforce");
+let Salesforce = require("./salesforce");
 
 module.exports.async = function(generator) {
-  return function() {
-    let iterator = generator.apply(this, arguments);
+  return function(...args) {
+    let iterator = generator.apply(this, args);
     return new Promise((resolve, reject) => {
       function await(step) {
         if (step.done) {
@@ -17,18 +17,18 @@ module.exports.async = function(generator) {
       await(iterator.next());
     });
   };
-}
+};
 
 module.exports.timeout = function(ms) {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     setTimeout(resolve, ms);
   });
-}
+};
 
 module.exports.login = module.exports.async(function*(options) {
   let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
   if (options.verbose) {
-    console.log("- Looking for password in file: " + pwfileName );
+    console.log("- Looking for password in file: " + pwfileName);
   }
   let filePromise = module.exports.nfcall(fs.readFile, "forcecmd.json", "utf-8");
   let pwfilePromise = module.exports.nfcall(fs.readFile, pwfileName, "utf-8");
@@ -53,11 +53,13 @@ module.exports.login = module.exports.async(function*(options) {
   if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
   if (loginUrl.port) throw "loginUrl must use the default port";
   console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
-  let sfConn = new salesforce();
+  let sfConn = new Salesforce();
+  /* eslint-disable no-underscore-dangle */
   if (options.netlog) {
     let oldRequestNetlog = sfConn._request;
-    sfConn._request = function(httpsOptions, requestBody) {
-      return oldRequestNetlog.apply(this, arguments).then(res => {
+    sfConn._request = function(...args) {
+      let [httpsOptions, requestBody] = args;
+      return oldRequestNetlog.apply(this, args).then(res => {
         console.log("request success");
         console.log("request options:", httpsOptions);
         console.log("request body:", requestBody);
@@ -70,12 +72,12 @@ module.exports.login = module.exports.async(function*(options) {
         console.log("response:", err);
         throw err;
       });
-    }
+    };
   }
   let oldRequest = sfConn._request;
-  sfConn._request = function() {
-    let doRequest = retries => {
-      return oldRequest.apply(this, arguments).catch(err => {
+  sfConn._request = function(...args) {
+    let doRequest = retries =>
+      oldRequest.apply(this, args).catch(err => {
         if (err && err.networkError && err.networkError.errno == "ETIMEDOUT" && err.networkError.syscall == "connect" && retries > 0) {
           console.log("(Got connect ETIMEDOUT, retrying)");
           return doRequest(retries - 1);
@@ -86,20 +88,20 @@ module.exports.login = module.exports.async(function*(options) {
         }
         throw err;
       });
-    }
     return doRequest(10);
-  }
+  };
+  /* eslint-enable no-underscore-dangle */
   yield sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
   return sfConn;
 });
 
-module.exports.asArray = salesforce.asArray;
+module.exports.asArray = Salesforce.asArray;
 
 module.exports.complete = module.exports.async(function*(doCheck) {
   let interval = 1000;
   yield module.exports.timeout(interval);
-  while (true) {
-    let result = yield doCheck()
+  for (;;) {
+    let result = yield doCheck();
     if (result.done !== "false") {
       return result;
     }
@@ -108,23 +110,21 @@ module.exports.complete = module.exports.async(function*(doCheck) {
   }
 });
 
-module.exports.nfcall = function nfapply(fn) {
-  let args = Array.prototype.slice.call(arguments, 1);
-  return new Promise(function(resolve, reject) {
-    try {
-      function nodeResolver(error, value) {
-        if (error) {
-          reject(error);
-        } else if (arguments.length > 2) {
-          resolve(Array.prototype.slice.call(arguments, 1));
-        } else {
-          resolve(value);
-        }
+module.exports.nfcall = function nfapply(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    function nodeResolver(error, ...values) {
+      if (error) {
+        reject(error);
+      } else if (values.length > 1) {
+        resolve(values);
+      } else {
+        resolve(values[0]);
       }
-      args.push(nodeResolver);
-      fn.apply(undefined, args);
+    }
+    try {
+      fn.apply(undefined, [...args, nodeResolver]);
     } catch (e) {
       reject(e);
     }
   });
-}
+};

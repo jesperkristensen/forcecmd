@@ -34,12 +34,12 @@ let xml = {
   }
 };
 
-module.exports = function() {
-  this.instanceHostname = null;
-  this.sessionId = null;
-}
+class Salesforce {
+  constructor() {
+    this.instanceHostname = null;
+    this.sessionId = null;
+  }
 
-module.exports.prototype = {
   partnerLogin(options) {
     return this._soap({
       host: options.hostname,
@@ -52,20 +52,20 @@ module.exports.prototype = {
         "password": options.password
       }
     })
-    .then(loginResult => {
-      let serverUrl = loginResult.serverUrl;
-      let sessionId = loginResult.sessionId;
-      serverUrl = /https:\/\/(.*)\/services/.exec(serverUrl)[1];
-      if (!serverUrl) {
-        throw "Login error: no serverUrl";
-      }
-      if (!sessionId) {
-        throw "Login error: no sessionId";
-      }
-      this.instanceHostname = serverUrl;
-      this.sessionId = sessionId;
-    });
-  },
+      .then(loginResult => {
+        let serverUrl = loginResult.serverUrl;
+        let sessionId = loginResult.sessionId;
+        serverUrl = /https:\/\/(.*)\/services/.exec(serverUrl)[1];
+        if (!serverUrl) {
+          throw "Login error: no serverUrl";
+        }
+        if (!sessionId) {
+          throw "Login error: no sessionId";
+        }
+        this.instanceHostname = serverUrl;
+        this.sessionId = sessionId;
+      });
+  }
 
   rest(url, options) {
     options = options || {};
@@ -94,7 +94,8 @@ module.exports.prototype = {
         if (response.statusCode == 400 && responseBody) {
           try {
             text = JSON.parse(responseBody).map(err => err.errorCode + ": " + err.message).join("\n");
-          } catch(ex) {
+          } catch (ex) {
+            // empty
           }
         }
         if (response.statusCode == 0) { // TODO does node work that way?
@@ -106,7 +107,7 @@ module.exports.prototype = {
         throw {restError: text};
       }
     });
-  },
+  }
 
   enterprise(apiVersion, method, body) {
     return this._soap({
@@ -117,7 +118,7 @@ module.exports.prototype = {
       method,
       body
     });
-  },
+  }
 
   partner(apiVersion, method, body) {
     return this._soap({
@@ -128,7 +129,7 @@ module.exports.prototype = {
       method,
       body
     });
-  },
+  }
 
   apex(apiVersion, method, body) {
     return this._soap({
@@ -139,7 +140,7 @@ module.exports.prototype = {
       method,
       body
     });
-  },
+  }
 
   metadata(apiVersion, method, body) {
     return this._soap({
@@ -150,7 +151,7 @@ module.exports.prototype = {
       method,
       body
     });
-  },
+  }
 
   tooling(apiVersion, method, body) {
     return this._soap({
@@ -161,7 +162,7 @@ module.exports.prototype = {
       method,
       body
     });
-  },
+  }
 
   _soap(options) {
     let httpsOptions = {
@@ -198,13 +199,13 @@ module.exports.prototype = {
         if (response.statusCode == 200) {
           return res[options.method + "Response"].result;
         } else {
-            throw res["soapenv:Fault"];
+          throw res["soapenv:Fault"];
         }
       } catch (e) {
         throw {soapResponseBody: responseBody, statusCode: response.statusCode, parseException: e};
       }
     });
-  },
+  }
 
   _request(httpsOptions, requestBody) {
     return new Promise((resolve, reject) => {
@@ -225,10 +226,13 @@ module.exports.prototype = {
       req.end();
     });
   }
-};
 
-module.exports.asArray = function(x) {
-  if (!x) return [];
-  if (x instanceof Array) return x;
-  return [x];
-};
+  static asArray(x) {
+    if (!x) return [];
+    if (x instanceof Array) return x;
+    return [x];
+  }
+
+}
+
+module.exports = Salesforce;

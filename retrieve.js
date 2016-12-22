@@ -12,12 +12,12 @@ module.exports.retrieve = function(cliArgs) {
   let asArray = common.asArray;
 
   function flattenArray(x) {
-    return [].concat.apply([], x);
+    return [].concat(...x);
   }
 
   let writeFile = common.async(function*(path, data) {
     let pos = -1;
-    while (true) {
+    for (;;) {
       pos = path.indexOf("/", pos + 1);
       if (pos == -1) {
         break;
@@ -60,11 +60,11 @@ module.exports.retrieve = function(cliArgs) {
             return;
           }
           if (soql instanceof Array) {
-            soql = "select " + soql.join(", ") + " from " + object
+            soql = "select " + soql.join(", ") + " from " + object;
           }
           if (soql === true) {
             console.log("DescribeSObject " + object);
-            let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe")
+            let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe");
             soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
           }
           if (typeof soql != "string") {
@@ -76,7 +76,7 @@ module.exports.retrieve = function(cliArgs) {
           console.log("Query " + object);
           let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
           let records = [];
-          while (true) {
+          for (;;) {
             for (let record of data.records) {
               delete record.attributes;
             }
@@ -155,7 +155,7 @@ module.exports.retrieve = function(cliArgs) {
         return flattenArray(p).concat(
           folders.map(folder => ({type: folderMap[folder.type], fullName: folder.fullName})),
           nonFolders,
-          xmlNames.map(xmlName => ({type: xmlName, fullName: '*'}))
+          xmlNames.map(xmlName => ({type: xmlName, fullName: "*"}))
         );
       })));
       let types = flattenArray(res);
@@ -182,7 +182,7 @@ module.exports.retrieve = function(cliArgs) {
       //console.log(types);
       let retrieve = common.async(function*() {
         console.log("Retrieve");
-        let result = yield conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types: types, version: common.apiVersion}}})
+        let result = yield conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types, version: common.apiVersion}}});
         console.log({id: result.id});
         let res = yield common.complete(() => {
           console.log("CheckRetrieveStatus");
