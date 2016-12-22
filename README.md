@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/jesperkristensen/forcecmd.svg?branch=master)](https://travis-ci.org/jesperkristensen/forcecmd)
+
 Command line tool for the Salesforce metadata API
 ========
 
