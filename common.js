@@ -1,9 +1,9 @@
 "use strict";
 let fs = require("graceful-fs");
 let url = require("url");
-let Salesforce = require("./salesforce");
+let SalesforceConnection = require("./salesforce");
 
-module.exports.async = function(generator) {
+function async(generator) {
   return function(...args) {
     let iterator = generator.apply(this, args);
     return new Promise((resolve, reject) => {
@@ -17,27 +17,23 @@ module.exports.async = function(generator) {
       await(iterator.next());
     });
   };
-};
+}
 
-module.exports.timeout = function(ms) {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-};
+let timeout = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-module.exports.login = module.exports.async(function*(options) {
+let login = async(function*(options) {
   let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
   if (options.verbose) {
     console.log("- Looking for password in file: " + pwfileName);
   }
-  let filePromise = module.exports.nfcall(fs.readFile, "forcecmd.json", "utf-8");
-  let pwfilePromise = module.exports.nfcall(fs.readFile, pwfileName, "utf-8");
+  let filePromise = nfcall(fs.readFile, "forcecmd.json", "utf-8");
+  let pwfilePromise = nfcall(fs.readFile, pwfileName, "utf-8");
   let file = yield filePromise;
   let pwfile = yield pwfilePromise;
   let config = JSON.parse(file);
-  module.exports.apiVersion = config.apiVersion;
-  module.exports.excludeDirs = config.excludeDirs || [];
-  module.exports.objects = config.objects || {};
+  let apiVersion = config.apiVersion;
+  let excludeDirs = config.excludeDirs || [];
+  let objects = config.objects || {};
   if (config.includeObjects) throw "includeObjects is obsolete";
   if (config.excludeObjects) throw "excludeObjects is obsolete";
   let pwKey = config.loginUrl + "$" + config.username;
@@ -53,7 +49,7 @@ module.exports.login = module.exports.async(function*(options) {
   if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
   if (loginUrl.port) throw "loginUrl must use the default port";
   console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
-  let sfConn = new Salesforce();
+  let sfConn = new SalesforceConnection();
   /* eslint-disable no-underscore-dangle */
   if (options.netlog) {
     let oldRequestNetlog = sfConn._request;
@@ -92,25 +88,10 @@ module.exports.login = module.exports.async(function*(options) {
   };
   /* eslint-enable no-underscore-dangle */
   yield sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
-  return sfConn;
+  return {sfConn, apiVersion, excludeDirs, objects};
 });
 
-module.exports.asArray = Salesforce.asArray;
-
-module.exports.complete = module.exports.async(function*(doCheck) {
-  let interval = 1000;
-  yield module.exports.timeout(interval);
-  for (;;) {
-    let result = yield doCheck();
-    if (result.done !== "false") {
-      return result;
-    }
-    interval *= 1.3;
-    yield module.exports.timeout(interval);
-  }
-});
-
-module.exports.nfcall = function nfapply(fn, ...args) {
+function nfcall(fn, ...args) {
   return new Promise((resolve, reject) => {
     function nodeResolver(error, ...values) {
       if (error) {
@@ -127,4 +108,6 @@ module.exports.nfcall = function nfapply(fn, ...args) {
       reject(e);
     }
   });
-};
+}
+
+module.exports = {async, timeout, login, nfcall};

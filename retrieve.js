@@ -1,21 +1,17 @@
 "use strict";
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
-let common = require("./common");
+let {async, nfcall, login, timeout} = require("./common");
 
 module.exports.retrieve = function(cliArgs) {
+  let logger = console;
   let verbose = cliArgs.indexOf("--verbose") > -1;
   let netlog = cliArgs.indexOf("--netlog") > -1;
   if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
     throw "unknown argument";
   }
-  let asArray = common.asArray;
 
-  function flattenArray(x) {
-    return [].concat(...x);
-  }
-
-  let writeFile = common.async(function*(path, data) {
+  let writeFile = async(function*(path, data) {
     let pos = -1;
     for (;;) {
       pos = path.indexOf("/", pos + 1);
@@ -24,28 +20,27 @@ module.exports.retrieve = function(cliArgs) {
       }
       let dir = path.substring(0, pos);
       try {
-        yield common.nfcall(fs.mkdir, dir);
+        yield nfcall(fs.mkdir, dir);
       } catch (err) {
         if (err.code != "EEXIST") throw err;
       }
     }
-    yield common.nfcall(fs.writeFile, path, data);
+    yield nfcall(fs.writeFile, path, data);
   });
 
-  let loginPromise = common.login({verbose, netlog});
+  let loginPromise = login({verbose, netlog});
 
-  common.async(function*() {
+  async(function*() {
     try {
-      let conn = yield loginPromise;
-      console.log("DescribeGlobal");
-      let describe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects");
+      let {sfConn, apiVersion, objects} = yield loginPromise;
+      logger.log("DescribeGlobal");
+      let describe = yield sfConn.rest("/services/data/v" + apiVersion + "/sobjects");
 
       if (verbose) {
-        console.log("- Objects included by default: " + JSON.stringify(describe.sobjects.filter(sobject => sobject.customSetting).map(sobject => sobject.name)));
-        console.log("- Objects not included by default: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
+        logger.log("- Objects included by default: " + JSON.stringify(describe.sobjects.filter(sobject => sobject.customSetting).map(sobject => sobject.name)));
+        logger.log("- Objects not included by default: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
       }
 
-      let objects = common.objects;
       for (let sobject of describe.sobjects) {
         if (sobject.customSetting && !(sobject.name in objects)) {
           objects[sobject.name] = true;
@@ -54,7 +49,7 @@ module.exports.retrieve = function(cliArgs) {
 
       let results = [];
       for (let object in objects) {
-        results.push(common.async(function*() {
+        results.push(async(function*() {
           let soql = objects[object];
           if (soql === false) {
             return;
@@ -63,18 +58,18 @@ module.exports.retrieve = function(cliArgs) {
             soql = "select " + soql.join(", ") + " from " + object;
           }
           if (soql === true) {
-            console.log("DescribeSObject " + object);
-            let objectDescribe = yield conn.rest("/services/data/v" + common.apiVersion + "/sobjects/" + object + "/describe");
+            logger.log("DescribeSObject " + object);
+            let objectDescribe = yield sfConn.rest("/services/data/v" + apiVersion + "/sobjects/" + object + "/describe");
             soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
           }
           if (typeof soql != "string") {
             throw "Cannot understand configuration of object: " + object;
           }
           if (verbose) {
-            console.log("- Using " + object + " SOQL: " + soql);
+            logger.log("- Using " + object + " SOQL: " + soql);
           }
-          console.log("Query " + object);
-          let data = yield conn.rest("/services/data/v" + common.apiVersion + "/query/?q=" + encodeURIComponent(soql));
+          logger.log("Query " + object);
+          let data = yield sfConn.rest("/services/data/v" + apiVersion + "/query/?q=" + encodeURIComponent(soql));
           let records = [];
           for (;;) {
             for (let record of data.records) {
@@ -84,8 +79,8 @@ module.exports.retrieve = function(cliArgs) {
             if (!data.nextRecordsUrl) {
               break;
             }
-            console.log("QueryMore " + object);
-            data = yield conn.rest(data.nextRecordsUrl);
+            logger.log("QueryMore " + object);
+            data = yield sfConn.rest(data.nextRecordsUrl);
           }
           yield writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
         })());
@@ -93,42 +88,48 @@ module.exports.retrieve = function(cliArgs) {
       yield Promise.all(results);
     } catch (e) {
       process.exitCode = 1;
-      console.error(e);
+      logger.error(e);
     }
   })();
 
-  function groupByThree(list) {
-    let groups = [];
-    for (let element of list) {
-      if (groups.length == 0 || groups[groups.length - 1].length == 3) {
-        groups.push([]);
-      }
-      groups[groups.length - 1].push(element);
+  async(function*() {
+    function flattenArray(x) {
+      return [].concat(...x);
     }
-    return groups;
-  }
 
-  common.async(function*() {
+    function groupByThree(list) {
+      let groups = [];
+      for (let element of list) {
+        if (groups.length == 0 || groups[groups.length - 1].length == 3) {
+          groups.push([]);
+        }
+        groups[groups.length - 1].push(element);
+      }
+      return groups;
+    }
+
     try {
-      let conn = yield loginPromise;
-      console.log("DescribeMetadata");
-      let res = yield conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
-      let folderMap = {};
-      let x1 = res.metadataObjects
+      let {sfConn, apiVersion, excludeDirs} = yield loginPromise;
+      let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
+      logger.log("DescribeMetadata");
+      let res = yield sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
+      let availableMetadataObjects = res.metadataObjects
         .filter(metadataObject => metadataObject.xmlName != "InstalledPackage");
       if (verbose) {
-        console.log("- Options available for excludeDirs: " + JSON.stringify(x1.map(metadataObject => metadataObject.directoryName)));
+        logger.log("- Options available for excludeDirs: " + JSON.stringify(availableMetadataObjects.map(metadataObject => metadataObject.directoryName)));
       }
-      let x = x1
+      let selectedMetadataObjects = availableMetadataObjects
         .filter(metadataObject => {
-          if (common.excludeDirs.indexOf(metadataObject.directoryName) > -1) {
-            console.log("(Excluding " + metadataObject.directoryName + ")");
+          if (excludeDirs.indexOf(metadataObject.directoryName) > -1) {
+            logger.log("(Excluding " + metadataObject.directoryName + ")");
             return false;
           }
           return true;
-        })
+        });
+      let folderMap = {};
+      let x = selectedMetadataObjects
         .map(metadataObject => {
-          let xmlNames = asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
+          let xmlNames = sfConn.asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName);
           return xmlNames.map(xmlName => {
             if (metadataObject.inFolder == "true") {
               if (xmlName == "EmailTemplate") {
@@ -142,15 +143,15 @@ module.exports.retrieve = function(cliArgs) {
             return xmlName;
           });
         });
-      res = yield Promise.all(groupByThree(flattenArray(x)).map(common.async(function*(xmlNames) {
-        console.log("ListMetadata " + xmlNames.join(", "));
-        let someItems = asArray(yield conn.metadata(common.apiVersion, "listMetadata", {queries: xmlNames.map(xmlName => ({type: xmlName}))}));
+      res = yield Promise.all(groupByThree(flattenArray(x)).map(async(function*(xmlNames) {
+        logger.log("ListMetadata " + xmlNames.join(", "));
+        let someItems = sfConn.asArray(yield sfConn.soap(metadataApi, "listMetadata", {queries: xmlNames.map(xmlName => ({type: xmlName}))}));
         let folders = someItems.filter(folder => folderMap[folder.type]);
         let nonFolders = someItems.filter(folder => !folderMap[folder.type]);
         let p = yield Promise
-          .all(groupByThree(folders).map(common.async(function*(folderGroup) {
-            console.log("ListMetadata " + folderGroup.map(folder => folderMap[folder.type] + "/" + folder.fullName).join(", "));
-            return asArray(yield conn.metadata(common.apiVersion, "listMetadata", {queries: folderGroup.map(folder => ({type: folderMap[folder.type], folder: folder.fullName}))}));
+          .all(groupByThree(folders).map(async(function*(folderGroup) {
+            logger.log("ListMetadata " + folderGroup.map(folder => folderMap[folder.type] + "/" + folder.fullName).join(", "));
+            return sfConn.asArray(yield sfConn.soap(metadataApi, "listMetadata", {queries: folderGroup.map(folder => ({type: folderMap[folder.type], folder: folder.fullName}))}));
           })));
         return flattenArray(p).concat(
           folders.map(folder => ({type: folderMap[folder.type], fullName: folder.fullName})),
@@ -179,18 +180,23 @@ module.exports.retrieve = function(cliArgs) {
         return 0;
       });
       types = types.map(x => ({name: x.type, members: decodeURIComponent(x.fullName)}));
-      //console.log(types);
-      let retrieve = common.async(function*() {
-        console.log("Retrieve");
-        let result = yield conn.metadata(common.apiVersion, "retrieve", {retrieveRequest: {apiVersion: common.apiVersion, unpackaged: {types, version: common.apiVersion}}});
-        console.log({id: result.id});
-        let res = yield common.complete(() => {
-          console.log("CheckRetrieveStatus");
-          return conn.metadata(common.apiVersion, "checkRetrieveStatus", {id: result.id});
-        });
+      //logger.log(types);
+      let retrieve = async(function*() {
+        logger.log("Retrieve");
+        let result = yield sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}});
+        logger.log({id: result.id});
+        let res;
+        for (let interval = 1000; ; interval *= 1.3) {
+          yield timeout(interval);
+          logger.log("CheckRetrieveStatus");
+          res = yield sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id});
+          if (res.done !== "false") {
+            break;
+          }
+        }
         if (res.errorStatusCode == "UNKNOWN_EXCEPTION" && typeof res.errorMessage == "string" && res.errorMessage.includes("Please include this ErrorId if you contact support")) {
           // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
-          console.error(res);
+          logger.error(res);
           return yield retrieve();
         }
         return res;
@@ -199,10 +205,16 @@ module.exports.retrieve = function(cliArgs) {
       if (res.success != "true") {
         throw res;
       }
-      console.log("(Reading response and writing files)");
-      let fsRemove = common.async(function*(path) {
+      let statusJson = JSON.stringify({
+        fileProperties: sfConn.asArray(res.fileProperties)
+          .filter(fp => fp.id != "000000000000000AAA" || fp.fullName != "")
+          .sort((fp1, fp2) => fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0),
+        messages: res.messages
+      }, null, "    ");
+      logger.log("(Reading response and writing files)");
+      let fsRemove = async(function*(path) {
         try {
-          yield common.nfcall(fs.unlink, path);
+          yield nfcall(fs.unlink, path);
         } catch (ex) {
           if (ex.code == "ENOENT") {
             // File does not exist
@@ -210,9 +222,9 @@ module.exports.retrieve = function(cliArgs) {
           }
           if (ex.code == "EPERM") {
             // Was not a file. Assume it was a directory
-            let files = yield common.nfcall(fs.readdir, path);
+            let files = yield nfcall(fs.readdir, path);
             yield Promise.all(files.map(file => fsRemove(path + "/" + file)));
-            yield common.nfcall(fs.rmdir, path);
+            yield nfcall(fs.rmdir, path);
           }
         }
       });
@@ -220,12 +232,7 @@ module.exports.retrieve = function(cliArgs) {
       // We wait until the old files are removed before we create the new
       let files = [];
 
-      files.push(writeFile("status.json", JSON.stringify({
-        fileProperties: asArray(res.fileProperties)
-          .filter(fp => fp.id != "000000000000000AAA" || fp.fullName != "")
-          .sort((fp1, fp2) => fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0),
-        messages: res.messages
-      }, null, "    ")));
+      files.push(writeFile("status.json", statusJson));
 
       // JSZip does not use the Base64 encoder built into Node. The custom Base64 encoder will cause Node to run out of memory on normally sized orgs.
       // JSZip will convert all input types to Uint8Array if they are deflate compressed (which they are).
@@ -243,11 +250,11 @@ module.exports.retrieve = function(cliArgs) {
           files.push(writeFile(name, arrBuf.byteLength == 0 ? Buffer.alloc(0) : Buffer.from(arrBuf)));
         }
       }
-      console.log({messages: res.messages, status: res.status});
+      logger.log({messages: res.messages, status: res.status});
       yield Promise.all(files);
     } catch (e) {
       process.exitCode = 1;
-      console.error(e);
+      logger.error(e);
     }
   })();
 };

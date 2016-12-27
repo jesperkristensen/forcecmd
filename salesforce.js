@@ -34,24 +34,23 @@ let xml = {
   }
 };
 
-class Salesforce {
+class SalesforceConnection {
   constructor() {
     this.instanceHostname = null;
     this.sessionId = null;
   }
 
   partnerLogin(options) {
-    return this._soap({
-      host: options.hostname,
-      path: "/services/Soap/u/" + options.apiVersion,
-      namespace: "urn:partner.soap.sforce.com",
-      method: "login",
-      header: {},
-      body: {
+    this.instanceHostname = options.hostname;
+    this.sessionId = null;
+    return this.soap(
+      this.wsdl(options.apiVersion, "Partner"),
+      "login",
+      {
         "username": options.username,
         "password": options.password
       }
-    })
+    )
       .then(loginResult => {
         let serverUrl = loginResult.serverUrl;
         let sessionId = loginResult.sessionId;
@@ -104,76 +103,50 @@ class Salesforce {
         if (!text) {
           text = "HTTP error " + response.statusCode + " " + response.statusMessage + (responseBody ? "\n\n" + responseBody : "");
         }
-        throw {restError: text};
+        throw {sfConnError: text};
       }
     });
   }
 
-  enterprise(apiVersion, method, body) {
-    return this._soap({
-      host: this.instanceHostname,
-      path: "/services/Soap/c/" + apiVersion,
-      namespace: "urn:enterprise.soap.sforce.com",
-      header: {SessionHeader: {sessionId: this.sessionId}},
-      method,
-      body
-    });
+  wsdl(apiVersion, apiName) {
+    return {
+      Enterprise: {
+        servicePortAddress: "/services/Soap/c/" + apiVersion,
+        targetNamespace: "urn:enterprise.soap.sforce.com"
+      },
+      Partner: {
+        servicePortAddress: "/services/Soap/u/" + apiVersion,
+        targetNamespace: "urn:partner.soap.sforce.com"
+      },
+      Apex: {
+        servicePortAddress: "/services/Soap/s/" + apiVersion,
+        targetNamespace: "http://soap.sforce.com/2006/08/apex"
+      },
+      Metadata: {
+        servicePortAddress: "/services/Soap/m/" + apiVersion,
+        targetNamespace: "http://soap.sforce.com/2006/04/metadata"
+      },
+      Tooling: {
+        servicePortAddress: "/services/Soap/T/" + apiVersion,
+        targetNamespace: "urn:tooling.soap.sforce.com"
+      }
+    }[apiName];
   }
 
-  partner(apiVersion, method, body) {
-    return this._soap({
-      host: this.instanceHostname,
-      path: "/services/Soap/u/" + apiVersion,
-      namespace: "urn:partner.soap.sforce.com",
-      header: {SessionHeader: {sessionId: this.sessionId}},
-      method,
-      body
-    });
-  }
-
-  apex(apiVersion, method, body) {
-    return this._soap({
-      host: this.instanceHostname,
-      path: "/services/Soap/s/" + apiVersion,
-      namespace: "http://soap.sforce.com/2006/08/apex",
-      header: {SessionHeader: {sessionId: this.sessionId}},
-      method,
-      body
-    });
-  }
-
-  metadata(apiVersion, method, body) {
-    return this._soap({
-      host: this.instanceHostname,
-      path: "/services/Soap/m/" + apiVersion,
-      namespace: "http://soap.sforce.com/2006/04/metadata",
-      header: {SessionHeader: {sessionId: this.sessionId}},
-      method,
-      body
-    });
-  }
-
-  tooling(apiVersion, method, body) {
-    return this._soap({
-      host: this.instanceHostname,
-      path: "/services/Soap/T/" + apiVersion,
-      namespace: "urn:tooling.soap.sforce.com",
-      header: {SessionHeader: {sessionId: this.sessionId}},
-      method,
-      body
-    });
-  }
-
-  _soap(options) {
+  soap(wsdl, method, args, headers) {
     let httpsOptions = {
-      host: options.host,
-      path: options.path,
+      host: this.instanceHostname,
+      path: wsdl.servicePortAddress,
       method: "POST",
       headers: {
         "Content-Type": "text/xml",
         "SOAPAction": '""'
       }
     };
+    let sessionHeader = null;
+    if (this.sessionId) {
+      sessionHeader = {SessionHeader: {sessionId: this.sessionId}};
+    }
     let requestBodyObject = {
       "soapenv:Envelope": {
         "$": {
@@ -182,11 +155,11 @@ class Salesforce {
           "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
         },
         "soapenv:Header": Object.assign({
-          "$": {"xmlns": options.namespace}
-        }, options.header),
+          "$": {"xmlns": wsdl.targetNamespace}
+        }, sessionHeader, headers),
         "soapenv:Body": {
-          "$": {"xmlns": options.namespace},
-          [options.method]: options.body
+          "$": {"xmlns": wsdl.targetNamespace},
+          [method]: args
         }
       }
     };
@@ -194,15 +167,11 @@ class Salesforce {
     return this._request(httpsOptions, requestBody).then(res => {
       let response = res.response;
       let responseBody = res.responseBody;
-      try {
-        let res = xml.parse(responseBody)["soapenv:Envelope"]["soapenv:Body"];
-        if (response.statusCode == 200) {
-          return res[options.method + "Response"].result;
-        } else {
-          throw res["soapenv:Fault"];
-        }
-      } catch (e) {
-        throw {soapResponseBody: responseBody, statusCode: response.statusCode, parseException: e};
+      let resBody = xml.parse(responseBody)["soapenv:Envelope"]["soapenv:Body"];
+      if (response.statusCode == 200) {
+        return resBody[method + "Response"].result;
+      } else {
+        throw {sfConnError: resBody["soapenv:Fault"].faultstring};
       }
     });
   }
@@ -227,7 +196,7 @@ class Salesforce {
     });
   }
 
-  static asArray(x) {
+  asArray(x) {
     if (!x) return [];
     if (x instanceof Array) return x;
     return [x];
@@ -235,4 +204,4 @@ class Salesforce {
 
 }
 
-module.exports = Salesforce;
+module.exports = SalesforceConnection;

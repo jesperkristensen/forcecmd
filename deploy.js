@@ -2,9 +2,9 @@
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
 let xmldom = require("xmldom");
-let common = require("./common");
+let {async, nfcall, login, timeout} = require("./common");
 
-module.exports.deploy = common.async(function*(cliArgs) {
+module.exports.deploy = async(function*(cliArgs) {
   try {
     let fileNames = [];
     let destroy = false;
@@ -22,7 +22,7 @@ module.exports.deploy = common.async(function*(cliArgs) {
       }
     }
 
-    let readAllFiles = common.async(function*() {
+    let readAllFiles = async(function*() {
       let readFiles = [];
 
       for (let fileName of fileNames) {
@@ -39,9 +39,9 @@ module.exports.deploy = common.async(function*(cliArgs) {
       }
 
       readFiles = yield Promise
-        .all(readFiles.map(common.async(function*(fileName) {
+        .all(readFiles.map(async(function*(fileName) {
           try {
-            let data = yield common.nfcall(fs.readFile, fileName);
+            let data = yield nfcall(fs.readFile, fileName);
             return {fileName, data};
           } catch (err) {
             if (err.code != "ENOENT") { throw err; }
@@ -57,9 +57,10 @@ module.exports.deploy = common.async(function*(cliArgs) {
     });
 
     let filesPromise = destroy ? null : readAllFiles();
-    let conn = yield common.login({verbose: false});
+    let {sfConn, apiVersion} = yield login({verbose: false});
+    let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
     console.log("Describe");
-    let describeResult = yield conn.metadata(common.apiVersion, "describeMetadata", {apiVersion: common.apiVersion});
+    let describeResult = yield sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
 
     let files = yield filesPromise;
 
@@ -133,7 +134,7 @@ module.exports.deploy = common.async(function*(cliArgs) {
       doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
     }
 
-    doc.documentElement.appendChild(tx("version", common.apiVersion));
+    doc.documentElement.appendChild(tx("version", apiVersion));
     let packageXml = new xmldom.XMLSerializer().serializeToString(doc);
     console.log(packageXml);
     zip.file("unpackaged/package.xml", Buffer.from(packageXml, "utf8"));
@@ -152,13 +153,18 @@ module.exports.deploy = common.async(function*(cliArgs) {
     // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used when passing "nodebuffer" to JSZip, but the difference is probably tiny.
     let zipFile = Buffer.from(zip.generate({type: "arraybuffer"})).toString("base64");
     console.log("Deploy");
-    let result = yield conn.metadata(common.apiVersion, "deploy", {zipFile, deployOptions});
+    let result = yield sfConn.soap(metadataApi, "deploy", {zipFile, deployOptions});
     console.log({id: result.id});
-    let res = yield common.complete(() => {
+    let res;
+    for (let interval = 1000; ; interval *= 1.3) {
+      yield timeout(interval);
       console.log("CheckDeployStatus");
-      return conn.metadata(common.apiVersion, "checkDeployStatus", {id: result.id, includeDetails: true});
-    });
-    console.log({status: res.status, errors: common.asArray(res.details.componentFailures)});
+      res = yield sfConn.soap(metadataApi, "checkDeployStatus", {id: result.id, includeDetails: true});
+      if (res.done !== "false") {
+        break;
+      }
+    }
+    console.log({status: res.status, errors: sfConn.asArray(res.details.componentFailures)});
   } catch (err) {
     process.exitCode = 1;
     console.error(err);
