@@ -89,6 +89,9 @@ class SalesforceConnection {
       let response = res.response;
       let responseBody = res.responseBody;
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (options.rawResponseBody) {
+          return responseBody;
+        }
         if (responseBody) {
           return JSON.parse(responseBody);
         }
