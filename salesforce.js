@@ -73,12 +73,16 @@ class SalesforceConnection {
       path: url,
       method: options.method || "GET",
       headers: {
-        "Authorization": "OAuth " + this.sessionId,
-        "Accept": "application/json"
+        "Accept": "application/json; charset=UTF-8"
       }
     };
+    if (options.bulk) {
+      httpsOptions.headers["X-SFDC-Session"] = this.sessionId;
+    } else {
+      httpsOptions.headers.Authorization = "OAuth " + this.sessionId;
+    }
     if (options.body) {
-      httpsOptions.headers["Content-Type"] = "application/json";
+      httpsOptions.headers["Content-Type"] = "application/json; charset=UTF-8";
     }
     let body = JSON.stringify(options.body);
     return this._request(httpsOptions, body).then(res => {

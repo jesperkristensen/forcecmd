@@ -22,36 +22,48 @@ function async(generator) {
 let timeout = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 let login = async(function*(options) {
-  let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
-  if (options.verbose) {
-    console.log("- Looking for password in file: " + pwfileName);
-  }
   let filePromise = nfcall(fs.readFile, "forcecmd.json", "utf-8");
-  let pwfilePromise = nfcall(fs.readFile, pwfileName, "utf-8");
   let file = yield filePromise;
-  let pwfile = yield pwfilePromise;
   let config = JSON.parse(file);
-  let apiVersion = config.apiVersion;
   let excludeDirs = config.excludeDirs || [];
   let objects = config.objects || {};
   if (config.includeObjects) throw "includeObjects is obsolete";
   if (config.excludeObjects) throw "excludeObjects is obsolete";
-  let pwKey = config.loginUrl + "$" + config.username;
-  if (options.verbose) {
-    console.log("- Looking for password with key: " + pwKey);
+  let apiVersion = config.apiVersion;
+  let sfConn = yield loginAs(Object.assign({robust: true}, config, options));
+  return {sfConn, apiVersion, excludeDirs, objects};
+});
+
+let loginAs = async(function*({apiVersion, loginUrl, username, password, robust, verbose, netlog}) {
+  if (!apiVersion) throw "Missing apiVersion";
+
+  if (!loginUrl) throw "Missing loginUrl";
+  let loginUrlParsed = url.parse(loginUrl);
+  if (loginUrlParsed.protocol != "https:") throw "loginUrl must start with https://";
+  if (loginUrlParsed.port) throw "loginUrl must use the default port";
+  let hostname = loginUrlParsed.hostname;
+
+  if (!username) throw "Missing username";
+
+  if (!password) {
+    let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
+    if (verbose) {
+      console.log("- Looking for password in file: " + pwfileName);
+    }
+    let pwfilePromise = nfcall(fs.readFile, pwfileName, "utf-8");
+    let pwfile = yield pwfilePromise;
+    let pwKey = loginUrl + "$" + username;
+    if (verbose) {
+      console.log("- Looking for password with key: " + pwKey);
+    }
+    password = JSON.parse(pwfile).passwords[pwKey];
   }
-  let password = JSON.parse(pwfile).passwords[pwKey];
-  if (!config.loginUrl) throw "Missing loginUrl";
-  if (!config.username) throw "Missing username";
   if (!password) throw "Missing password";
-  if (!config.apiVersion) throw "Missing apiVersion";
-  let loginUrl = url.parse(config.loginUrl);
-  if (loginUrl.protocol != "https:") throw "loginUrl must start with https://";
-  if (loginUrl.port) throw "loginUrl must use the default port";
-  console.log("Login " + loginUrl.hostname + " " + config.username + " " + config.apiVersion);
+
   let sfConn = new SalesforceConnection();
+
   /* eslint-disable no-underscore-dangle */
-  if (options.netlog) {
+  if (netlog) {
     let oldRequestNetlog = sfConn._request;
     sfConn._request = function(...args) {
       let [httpsOptions, requestBody] = args;
@@ -70,25 +82,30 @@ let login = async(function*(options) {
       });
     };
   }
-  let oldRequest = sfConn._request;
-  sfConn._request = function(...args) {
-    let doRequest = retries =>
-      oldRequest.apply(this, args).catch(err => {
-        if (err && err.networkError && err.networkError.errno == "ETIMEDOUT" && err.networkError.syscall == "connect" && retries > 0) {
-          console.log("(Got connect ETIMEDOUT, retrying)");
-          return doRequest(retries - 1);
-        }
-        if (err && err.networkError && err.networkError.errno == "ECONNRESET" && err.networkError.syscall == "read" && retries > 0) {
-          console.log("(Got read ECONNRESET, retrying)");
-          return doRequest(retries - 1);
-        }
-        throw err;
-      });
-    return doRequest(10);
-  };
+
+  if (robust) {
+    let oldRequest = sfConn._request;
+    sfConn._request = function(...args) {
+      let doRequest = retries =>
+        oldRequest.apply(this, args).catch(err => {
+          if (err && err.networkError && err.networkError.errno == "ETIMEDOUT" && err.networkError.syscall == "connect" && retries > 0) {
+            console.log("(Got connect ETIMEDOUT, retrying)");
+            return doRequest(retries - 1);
+          }
+          if (err && err.networkError && err.networkError.errno == "ECONNRESET" && err.networkError.syscall == "read" && retries > 0) {
+            console.log("(Got read ECONNRESET, retrying)");
+            return doRequest(retries - 1);
+          }
+          throw err;
+        });
+      return doRequest(10);
+    };
+  }
   /* eslint-enable no-underscore-dangle */
-  yield sfConn.partnerLogin({hostname: loginUrl.hostname, apiVersion: config.apiVersion, username: config.username, password});
-  return {sfConn, apiVersion, excludeDirs, objects};
+
+  console.log("Login " + hostname + " " + username + " " + apiVersion);
+  yield sfConn.partnerLogin({hostname, apiVersion, username, password});
+  return sfConn;
 });
 
 function nfcall(fn, ...args) {
@@ -110,4 +127,4 @@ function nfcall(fn, ...args) {
   });
 }
 
-module.exports = {async, timeout, login, nfcall};
+module.exports = {async, timeout, login, loginAs, nfcall};
