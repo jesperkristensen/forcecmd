@@ -88,9 +88,10 @@ class SalesforceConnection {
     return this._request(httpsOptions, body).then(res => {
       let response = res.response;
       let responseBody = res.responseBody;
-      if (response.statusCode == 200) {
-        return JSON.parse(responseBody);
-      } else if (response.statusCode == 204) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (responseBody) {
+          return JSON.parse(responseBody);
+        }
         return null;
       } else {
         let text;
