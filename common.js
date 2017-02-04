@@ -47,7 +47,7 @@ let loginAs = async(function*({apiVersion, loginUrl, username, password, robust,
 
   if (!password && process.env.FORCEPW) {
     if (verbose) {
-      console.log("- Using password from FPRCEPW environment variable");
+      console.log("- Using password from FORCEPW environment variable");
     }
     password = process.env.FORCEPW;
   }
