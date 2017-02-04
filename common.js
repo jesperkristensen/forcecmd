@@ -45,6 +45,13 @@ let loginAs = async(function*({apiVersion, loginUrl, username, password, robust,
 
   if (!username) throw "Missing username";
 
+  if (!password && process.env.FORCEPW) {
+    if (verbose) {
+      console.log("- Using password from FPRCEPW environment variable");
+    }
+    password = process.env.FORCEPW;
+  }
+
   if (!password) {
     let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
     if (verbose) {
