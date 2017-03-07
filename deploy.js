@@ -157,6 +157,7 @@ module.exports.deploy = async cliArgs => {
     console.log({id: result.id});
     let res;
     for (let interval = 1000; ; interval *= 1.3) {
+      console.log("(Waiting)");
       await timeout(interval);
       console.log("CheckDeployStatus");
       res = await sfConn.soap(metadataApi, "checkDeployStatus", {id: result.id, includeDetails: true});

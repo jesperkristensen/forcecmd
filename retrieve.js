@@ -185,6 +185,7 @@ module.exports.retrieve = function(cliArgs) {
       let result = await sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}});
       logger.log({id: result.id});
       for (let interval = 1000; ; interval *= 1.3) {
+        logger.log("(Waiting)");
         await timeout(interval);
         logger.log("CheckRetrieveStatus");
         res = await sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id});
