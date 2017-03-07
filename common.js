@@ -3,8 +3,10 @@ let fs = require("graceful-fs");
 let url = require("url");
 let SalesforceConnection = require("./salesforce");
 
+// A Promise based timeout
 let timeout = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+// Login using the configuration from ./forcecmd.json and password from ~/forcepw.json
 async function login(options) {
   let filePromise = nfcall(fs.readFile, "forcecmd.json", "utf-8");
   let file = await filePromise;
@@ -18,6 +20,7 @@ async function login(options) {
   return {sfConn, apiVersion, excludeDirs, objects};
 }
 
+// Login using a custom configuration and optionally password from ~/forcepw.json
 async function loginAs({apiVersion, loginUrl, username, password, robust, verbose, netlog}) {
   if (!apiVersion) throw "Missing apiVersion";
 
@@ -99,6 +102,7 @@ async function loginAs({apiVersion, loginUrl, username, password, robust, verbos
   return sfConn;
 }
 
+// Turn a Node style callback function into a promise
 function nfcall(fn, ...args) {
   return new Promise((resolve, reject) => {
     function nodeResolver(error, ...values) {
