@@ -2,9 +2,9 @@
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
 let xmldom = require("xmldom");
-let {async, nfcall, login, timeout} = require("./common");
+let {nfcall, login, timeout} = require("./common");
 
-module.exports.deploy = async(function*(cliArgs) {
+module.exports.deploy = async cliArgs => {
   try {
     let fileNames = [];
     let destroy = false;
@@ -22,7 +22,7 @@ module.exports.deploy = async(function*(cliArgs) {
       }
     }
 
-    let readAllFiles = async(function*() {
+    let readAllFiles = async () => {
       let readFiles = [];
 
       for (let fileName of fileNames) {
@@ -38,31 +38,31 @@ module.exports.deploy = async(function*(cliArgs) {
         }
       }
 
-      readFiles = yield Promise
-        .all(readFiles.map(async(function*(fileName) {
+      readFiles = await Promise
+        .all(readFiles.map(async fileName => {
           try {
-            let data = yield nfcall(fs.readFile, fileName);
+            let data = await nfcall(fs.readFile, fileName);
             return {fileName, data};
           } catch (err) {
             if (err.code != "ENOENT") { throw err; }
             return {fileName, data: null};
           }
-        })));
+        }));
       let files = {};
       for (let readFile of readFiles) {
         files[readFile.fileName] = readFile.data;
       }
       console.log("(Reading files done)");
       return files;
-    });
+    };
 
     let filesPromise = destroy ? null : readAllFiles();
-    let {sfConn, apiVersion} = yield login({verbose: false});
+    let {sfConn, apiVersion} = await login({verbose: false});
     let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
     console.log("Describe");
-    let describeResult = yield sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
+    let describeResult = await sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
 
-    let files = yield filesPromise;
+    let files = await filesPromise;
 
     let metadataObjectsByDir = {};
     for (let metadataObject of describeResult.metadataObjects) {
@@ -153,13 +153,13 @@ module.exports.deploy = async(function*(cliArgs) {
     // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used when passing "nodebuffer" to JSZip, but the difference is probably tiny.
     let zipFile = Buffer.from(zip.generate({type: "arraybuffer"})).toString("base64");
     console.log("Deploy");
-    let result = yield sfConn.soap(metadataApi, "deploy", {zipFile, deployOptions});
+    let result = await sfConn.soap(metadataApi, "deploy", {zipFile, deployOptions});
     console.log({id: result.id});
     let res;
     for (let interval = 1000; ; interval *= 1.3) {
-      yield timeout(interval);
+      await timeout(interval);
       console.log("CheckDeployStatus");
-      res = yield sfConn.soap(metadataApi, "checkDeployStatus", {id: result.id, includeDetails: true});
+      res = await sfConn.soap(metadataApi, "checkDeployStatus", {id: result.id, includeDetails: true});
       if (res.done !== "false") {
         break;
       }
@@ -169,4 +169,4 @@ module.exports.deploy = async(function*(cliArgs) {
     process.exitCode = 1;
     console.error(err);
   }
-});
+};

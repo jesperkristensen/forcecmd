@@ -11,7 +11,7 @@
     "xml2js": "*"
   },
   "devDependencies": {
-    "eslint": "^3.11.0"
+    "eslint": "3.17.1"
   },
   "scripts": {
     "eslint": "eslint ."

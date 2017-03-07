@@ -3,38 +3,22 @@ let fs = require("graceful-fs");
 let url = require("url");
 let SalesforceConnection = require("./salesforce");
 
-function async(generator) {
-  return function(...args) {
-    let iterator = generator.apply(this, args);
-    return new Promise((resolve, reject) => {
-      function await(step) {
-        if (step.done) {
-          resolve(step.value);
-          return;
-        }
-        Promise.resolve(step.value).then(iterator.next.bind(iterator), iterator.throw.bind(iterator)).then(await, reject);
-      }
-      await(iterator.next());
-    });
-  };
-}
-
 let timeout = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-let login = async(function*(options) {
+async function login(options) {
   let filePromise = nfcall(fs.readFile, "forcecmd.json", "utf-8");
-  let file = yield filePromise;
+  let file = await filePromise;
   let config = JSON.parse(file);
   let excludeDirs = config.excludeDirs || [];
   let objects = config.objects || {};
   if (config.includeObjects) throw "includeObjects is obsolete";
   if (config.excludeObjects) throw "excludeObjects is obsolete";
   let apiVersion = config.apiVersion;
-  let sfConn = yield loginAs(Object.assign({robust: true}, config, options));
+  let sfConn = await loginAs(Object.assign({robust: true}, config, options));
   return {sfConn, apiVersion, excludeDirs, objects};
-});
+}
 
-let loginAs = async(function*({apiVersion, loginUrl, username, password, robust, verbose, netlog}) {
+async function loginAs({apiVersion, loginUrl, username, password, robust, verbose, netlog}) {
   if (!apiVersion) throw "Missing apiVersion";
 
   if (!loginUrl) throw "Missing loginUrl";
@@ -58,7 +42,7 @@ let loginAs = async(function*({apiVersion, loginUrl, username, password, robust,
       console.log("- Looking for password in file: " + pwfileName);
     }
     let pwfilePromise = nfcall(fs.readFile, pwfileName, "utf-8");
-    let pwfile = yield pwfilePromise;
+    let pwfile = await pwfilePromise;
     let pwKey = loginUrl + "$" + username;
     if (verbose) {
       console.log("- Looking for password with key: " + pwKey);
@@ -111,9 +95,9 @@ let loginAs = async(function*({apiVersion, loginUrl, username, password, robust,
   /* eslint-enable no-underscore-dangle */
 
   console.log("Login " + hostname + " " + username + " " + apiVersion);
-  yield sfConn.partnerLogin({hostname, apiVersion, username, password});
+  await sfConn.partnerLogin({hostname, apiVersion, username, password});
   return sfConn;
-});
+}
 
 function nfcall(fn, ...args) {
   return new Promise((resolve, reject) => {
@@ -134,4 +118,4 @@ function nfcall(fn, ...args) {
   });
 }
 
-module.exports = {async, timeout, login, loginAs, nfcall};
+module.exports = {timeout, login, loginAs, nfcall};
