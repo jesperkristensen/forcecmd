@@ -181,27 +181,17 @@ module.exports.retrieve = function(cliArgs) {
       });
       types = types.map(x => ({name: x.type, members: decodeURIComponent(x.fullName)}));
       //logger.log(types);
-      let retrieve = async () => {
-        logger.log("Retrieve");
-        let result = await sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}});
-        logger.log({id: result.id});
-        let res;
-        for (let interval = 1000; ; interval *= 1.3) {
-          await timeout(interval);
-          logger.log("CheckRetrieveStatus");
-          res = await sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id});
-          if (res.done !== "false") {
-            break;
-          }
+      logger.log("Retrieve");
+      let result = await sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}});
+      logger.log({id: result.id});
+      for (let interval = 1000; ; interval *= 1.3) {
+        await timeout(interval);
+        logger.log("CheckRetrieveStatus");
+        res = await sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id});
+        if (res.done !== "false") {
+          break;
         }
-        if (res.errorStatusCode == "UNKNOWN_EXCEPTION" && typeof res.errorMessage == "string" && res.errorMessage.includes("Please include this ErrorId if you contact support")) {
-          // Try again, from the beginning, https://developer.salesforce.com/forums/?feedtype=RECENT#!/feedtype=SINGLE_QUESTION_DETAIL&dc=APIs_and_Integration&criteria=OPENQUESTIONS&id=906F0000000AidVIAS
-          logger.error(res);
-          return await retrieve();
-        }
-        return res;
-      };
-      res = await retrieve();
+      }
       if (res.success != "true") {
         throw res;
       }
