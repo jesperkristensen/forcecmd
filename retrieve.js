@@ -4,7 +4,11 @@ let JSZip = require("jszip");
 let {nfcall, login, timeout} = require("./common");
 
 module.exports.retrieve = function(cliArgs) {
-  let logger = console;
+  function logWait(msg, promise) {
+    console.log(msg);
+    return promise;
+  }
+
   let verbose = cliArgs.indexOf("--verbose") > -1;
   let netlog = cliArgs.indexOf("--netlog") > -1;
   if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
@@ -33,12 +37,14 @@ module.exports.retrieve = function(cliArgs) {
   (async () => {
     try {
       let {sfConn, apiVersion, objects} = await loginPromise;
-      logger.log("DescribeGlobal");
-      let describe = await sfConn.rest("/services/data/v" + apiVersion + "/sobjects");
+      let describe = await logWait(
+        "DescribeGlobal",
+        sfConn.rest("/services/data/v" + apiVersion + "/sobjects")
+      );
 
       if (verbose) {
-        logger.log("- Objects included by default: " + JSON.stringify(describe.sobjects.filter(sobject => sobject.customSetting).map(sobject => sobject.name)));
-        logger.log("- Objects not included by default: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
+        console.log("- Objects included by default: " + JSON.stringify(describe.sobjects.filter(sobject => sobject.customSetting).map(sobject => sobject.name)));
+        console.log("- Objects not included by default: " + JSON.stringify(describe.sobjects.filter(sobject => !sobject.customSetting).map(sobject => sobject.name)));
       }
 
       for (let sobject of describe.sobjects) {
@@ -58,18 +64,22 @@ module.exports.retrieve = function(cliArgs) {
             soql = "select " + soql.join(", ") + " from " + object;
           }
           if (soql === true) {
-            logger.log("DescribeSObject " + object);
-            let objectDescribe = await sfConn.rest("/services/data/v" + apiVersion + "/sobjects/" + object + "/describe");
+            let objectDescribe = await logWait(
+              "DescribeSObject " + object,
+              sfConn.rest("/services/data/v" + apiVersion + "/sobjects/" + object + "/describe")
+            );
             soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
           }
           if (typeof soql != "string") {
             throw "Cannot understand configuration of object: " + object;
           }
           if (verbose) {
-            logger.log("- Using " + object + " SOQL: " + soql);
+            console.log("- Using " + object + " SOQL: " + soql);
           }
-          logger.log("Query " + object);
-          let data = await sfConn.rest("/services/data/v" + apiVersion + "/query/?q=" + encodeURIComponent(soql));
+          let data = await logWait(
+            "Query " + object,
+            sfConn.rest("/services/data/v" + apiVersion + "/query/?q=" + encodeURIComponent(soql))
+          );
           let records = [];
           for (;;) {
             for (let record of data.records) {
@@ -79,8 +89,10 @@ module.exports.retrieve = function(cliArgs) {
             if (!data.nextRecordsUrl) {
               break;
             }
-            logger.log("QueryMore " + object);
-            data = await sfConn.rest(data.nextRecordsUrl);
+            data = await logWait(
+              "QueryMore " + object,
+              sfConn.rest(data.nextRecordsUrl)
+            );
           }
           await writeFile("data/" + object + ".json", JSON.stringify(records, null, "    "));
         })());
@@ -88,7 +100,7 @@ module.exports.retrieve = function(cliArgs) {
       await Promise.all(results);
     } catch (e) {
       process.exitCode = 1;
-      logger.error(e);
+      console.error(e);
     }
   })();
 
@@ -111,17 +123,19 @@ module.exports.retrieve = function(cliArgs) {
     try {
       let {sfConn, apiVersion, excludeDirs} = await loginPromise;
       let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
-      logger.log("DescribeMetadata");
-      let res = await sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
+      let res = await logWait(
+        "DescribeMetadata",
+        sfConn.soap(metadataApi, "describeMetadata", {apiVersion})
+      );
       let availableMetadataObjects = res.metadataObjects
         .filter(metadataObject => metadataObject.xmlName != "InstalledPackage");
       if (verbose) {
-        logger.log("- Options available for excludeDirs: " + JSON.stringify(availableMetadataObjects.map(metadataObject => metadataObject.directoryName)));
+        console.log("- Options available for excludeDirs: " + JSON.stringify(availableMetadataObjects.map(metadataObject => metadataObject.directoryName)));
       }
       let selectedMetadataObjects = availableMetadataObjects
         .filter(metadataObject => {
           if (excludeDirs.indexOf(metadataObject.directoryName) > -1) {
-            logger.log("(Excluding " + metadataObject.directoryName + ")");
+            console.log("(Excluding " + metadataObject.directoryName + ")");
             return false;
           }
           return true;
@@ -144,15 +158,19 @@ module.exports.retrieve = function(cliArgs) {
           });
         });
       res = await Promise.all(groupByThree(flattenArray(x)).map(async xmlNames => {
-        logger.log("ListMetadata " + xmlNames.join(", "));
-        let someItems = sfConn.asArray(await sfConn.soap(metadataApi, "listMetadata", {queries: xmlNames.map(xmlName => ({type: xmlName}))}));
+        let someItems = sfConn.asArray(await logWait(
+          "ListMetadata " + xmlNames.join(", "),
+          sfConn.soap(metadataApi, "listMetadata", {queries: xmlNames.map(xmlName => ({type: xmlName}))})
+        ));
         let folders = someItems.filter(folder => folderMap[folder.type]);
         let nonFolders = someItems.filter(folder => !folderMap[folder.type]);
         let p = await Promise
-          .all(groupByThree(folders).map(async folderGroup => {
-            logger.log("ListMetadata " + folderGroup.map(folder => folderMap[folder.type] + "/" + folder.fullName).join(", "));
-            return sfConn.asArray(await sfConn.soap(metadataApi, "listMetadata", {queries: folderGroup.map(folder => ({type: folderMap[folder.type], folder: folder.fullName}))}));
-          }));
+          .all(groupByThree(folders).map(async folderGroup =>
+            sfConn.asArray(await logWait(
+              "ListMetadata " + folderGroup.map(folder => folderMap[folder.type] + "/" + folder.fullName).join(", "),
+              sfConn.soap(metadataApi, "listMetadata", {queries: folderGroup.map(folder => ({type: folderMap[folder.type], folder: folder.fullName}))})
+            ))
+          ));
         return flattenArray(p).concat(
           folders.map(folder => ({type: folderMap[folder.type], fullName: folder.fullName})),
           nonFolders,
@@ -180,15 +198,21 @@ module.exports.retrieve = function(cliArgs) {
         return 0;
       });
       types = types.map(x => ({name: x.type, members: decodeURIComponent(x.fullName)}));
-      //logger.log(types);
-      logger.log("Retrieve");
-      let result = await sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}});
-      logger.log({id: result.id});
+      //console.log(types);
+      let result = await logWait(
+        "Retrieve",
+        sfConn.soap(metadataApi, "retrieve", {retrieveRequest: {apiVersion, unpackaged: {types, version: apiVersion}}})
+      );
+      console.log({id: result.id});
       for (let interval = 1000; ; interval *= 1.3) {
-        logger.log("(Waiting)");
-        await timeout(interval);
-        logger.log("CheckRetrieveStatus");
-        res = await sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id});
+        await logWait(
+          "(Waiting)",
+          timeout(interval)
+        );
+        res = await logWait(
+          "CheckRetrieveStatus",
+          sfConn.soap(metadataApi, "checkRetrieveStatus", {id: result.id})
+        );
         if (res.done !== "false") {
           break;
         }
@@ -202,7 +226,7 @@ module.exports.retrieve = function(cliArgs) {
           .sort((fp1, fp2) => fp1.fileName < fp2.fileName ? -1 : fp1.fileName > fp2.fileName ? 1 : 0),
         messages: res.messages
       }, null, "    ");
-      logger.log("(Reading response and writing files)");
+      console.log("(Reading response and writing files)");
       let fsRemove = async path => {
         try {
           await nfcall(fs.unlink, path);
@@ -241,11 +265,11 @@ module.exports.retrieve = function(cliArgs) {
           files.push(writeFile(name, arrBuf.byteLength == 0 ? Buffer.alloc(0) : Buffer.from(arrBuf)));
         }
       }
-      logger.log({messages: res.messages, status: res.status});
+      console.log({messages: res.messages, status: res.status});
       await Promise.all(files);
     } catch (e) {
       process.exitCode = 1;
-      logger.error(e);
+      console.error(e);
     }
   })();
 };
