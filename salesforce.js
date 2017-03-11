@@ -1,38 +1,7 @@
 "use strict";
 let https = require("https");
-let xml2js = require("xml2js");
-
-let xml = {
-  parse(xml) {
-    let err, res;
-    xml2js.parseString(xml, (error, result) => {
-      err = error;
-      res = result;
-    });
-    if (err) {
-      throw err;
-    }
-    function unarray(obj) {
-      if (obj instanceof Array && obj.length == 1) {
-        return unarray(obj[0]);
-      } else if (obj instanceof Array) {
-        return obj.map(el => unarray(el));
-      } else if (obj !== null && typeof obj == "object") {
-        let target = {};
-        for (let key in obj) {
-          target[key] = unarray(obj[key]);
-        }
-        return target;
-      } else {
-        return obj;
-      }
-    }
-    return unarray(res);
-  },
-  stringify(obj) {
-    return (new xml2js.Builder()).buildObject(obj);
-  }
-};
+let xmlParser = require("./xmlparser");
+let xmlBuilder = require("./xmlbuilder");
 
 class SalesforceConnection {
   constructor() {
@@ -155,27 +124,18 @@ class SalesforceConnection {
     if (this.sessionId) {
       sessionHeader = {SessionHeader: {sessionId: this.sessionId}};
     }
-    let requestBodyObject = {
-      "soapenv:Envelope": {
-        "$": {
-          "xmlns:soapenv": "http://schemas.xmlsoap.org/soap/envelope/",
-          "xmlns:xsd": "http://www.w3.org/2001/XMLSchema",
-          "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
-        },
-        "soapenv:Header": Object.assign({
-          "$": {"xmlns": wsdl.targetNamespace}
-        }, sessionHeader, headers),
-        "soapenv:Body": {
-          "$": {"xmlns": wsdl.targetNamespace},
-          [method]: args
-        }
+    let requestBody = xmlBuilder(
+      "soapenv:Envelope",
+      ' xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="' + wsdl.targetNamespace + '"',
+      {
+        "soapenv:Header": Object.assign({}, sessionHeader, headers),
+        "soapenv:Body": {[method]: args}
       }
-    };
-    let requestBody = xml.stringify(requestBodyObject);
+    );
     return this._request(httpsOptions, requestBody).then(res => {
       let response = res.response;
       let responseBody = res.responseBody;
-      let resBody = xml.parse(responseBody)["soapenv:Envelope"]["soapenv:Body"];
+      let resBody = xmlParser(responseBody)["soapenv:Envelope"]["soapenv:Body"];
       if (response.statusCode == 200) {
         return resBody[method + "Response"].result;
       } else {

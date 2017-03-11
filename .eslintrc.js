@@ -35,7 +35,6 @@ module.exports = {
     "keyword-spacing": "error",
     "new-cap": "error",
     "no-array-constructor": "error",
-    "no-lonely-if": "error",
     "no-mixed-operators": "error",
     "no-new-object": "error",
     "no-tabs": "error",

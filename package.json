@@ -5,10 +5,8 @@
     "forcecmd": "cli.js"
   },
   "dependencies": {
-    "jszip": "2.2.x",
-    "xmldom": "*",
     "graceful-fs": "*",
-    "xml2js": "*"
+    "jszip": "2.2.x"
   },
   "devDependencies": {
     "eslint": "3.17.1"

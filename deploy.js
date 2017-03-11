@@ -1,7 +1,7 @@
 "use strict";
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
-let xmldom = require("xmldom");
+let xmlBuilder = require("./xmlbuilder");
 let {nfcall, login, timeout} = require("./common");
 
 module.exports.deploy = async cliArgs => {
@@ -70,20 +70,7 @@ module.exports.deploy = async cliArgs => {
     }
 
     let zip = new JSZip();
-    let doc = xmldom.DOMImplementation.prototype.createDocument("http://soap.sforce.com/2006/04/metadata", "Package");
-    doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
-    let el = (name, children) => {
-      let e = doc.createElement(name);
-      for (let child of children) {
-        e.appendChild(child);
-      }
-      return e;
-    };
-    let tx = (name, text) => {
-      let e = doc.createElement(name);
-      e.textContent = text;
-      return e;
-    };
+    let doc = {types: []};
     for (let fileName of fileNames) {
       let fullName, zipFileName;
       if (fileName.substr(-1) == "/") { // It is a "Folder". It does not have a main metadata file, only the -meta.xml file.
@@ -117,25 +104,22 @@ module.exports.deploy = async cliArgs => {
         throw "Metadata not found for file: " + fileName;
       }
 
-      doc.documentElement.appendChild(
-        el("types", [
-          tx("members", fullName),
-          tx("name", metadataObjectsByDir[typeDirName].xmlName)
-        ])
-      );
+      doc.types.push({
+        members: fullName,
+        name: metadataObjectsByDir[typeDirName].xmlName
+      });
     }
 
     if (destroy) {
-      let destructiveChangesXml = new xmldom.XMLSerializer().serializeToString(doc);
+      let destructiveChangesXml = xmlBuilder("Package", ' xmlns="http://soap.sforce.com/2006/04/metadata"', doc);
       console.log(destructiveChangesXml);
       zip.file("unpackaged/destructiveChanges.xml", Buffer.from(destructiveChangesXml, "utf8"));
 
-      doc = xmldom.DOMImplementation.prototype.createDocument("http://soap.sforce.com/2006/04/metadata", "Package");
-      doc.documentElement.setAttribute("xmlns", "http://soap.sforce.com/2006/04/metadata");
+      doc = {};
     }
 
-    doc.documentElement.appendChild(tx("version", apiVersion));
-    let packageXml = new xmldom.XMLSerializer().serializeToString(doc);
+    doc.version = apiVersion;
+    let packageXml = xmlBuilder("Package", ' xmlns="http://soap.sforce.com/2006/04/metadata"', doc);
     console.log(packageXml);
     zip.file("unpackaged/package.xml", Buffer.from(packageXml, "utf8"));
 
