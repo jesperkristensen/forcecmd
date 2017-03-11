@@ -12,6 +12,11 @@
       "from": "jszip@>=2.2.0 <2.3.0",
       "resolved": "https://registry.npmjs.org/jszip/-/jszip-2.2.2.tgz"
     },
+    "node-salesforce-connection": {
+      "version": "1.0.0",
+      "from": "node-salesforce-connection@1.0.0",
+      "resolved": "https://registry.npmjs.org/node-salesforce-connection/-/node-salesforce-connection-1.0.0.tgz"
+    },
     "pako": {
       "version": "0.2.9",
       "from": "pako@>=0.2.1 <0.3.0",

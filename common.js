@@ -1,7 +1,7 @@
 "use strict";
 let fs = require("graceful-fs");
 let url = require("url");
-let SalesforceConnection = require("./salesforce");
+let SalesforceConnection = require("node-salesforce-connection");
 
 // A Promise based timeout
 let timeout = ms => new Promise(resolve => setTimeout(resolve, ms));

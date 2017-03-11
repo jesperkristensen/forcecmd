@@ -1,12 +1,16 @@
 {
   "name": "forcecmd",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "A command-line tool for the Salesforce metadata API",
+  "license": "MIT",
+  "repository": "jesperkristensen/forcecmd",
   "bin": {
     "forcecmd": "cli.js"
   },
   "dependencies": {
     "graceful-fs": "*",
-    "jszip": "2.2.x"
+    "jszip": "2.2.x",
+    "node-salesforce-connection": "1.0.0"
   },
   "devDependencies": {
     "eslint": "3.17.1"

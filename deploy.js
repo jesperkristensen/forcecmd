@@ -1,7 +1,7 @@
 "use strict";
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
-let xmlBuilder = require("./xmlbuilder");
+let xmlBuilder = require("node-salesforce-connection/xmlbuilder");
 let {nfcall, login, timeout} = require("./common");
 
 module.exports.deploy = async cliArgs => {
