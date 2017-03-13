@@ -98,7 +98,7 @@ async function loginAs({apiVersion, loginUrl, username, password, robust, verbos
   /* eslint-enable no-underscore-dangle */
 
   console.log("Login " + hostname + " " + username + " " + apiVersion);
-  await sfConn.partnerLogin({hostname, apiVersion, username, password});
+  await sfConn.soapLogin({hostname, apiVersion, username, password});
   return sfConn;
 }
 
