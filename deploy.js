@@ -1,7 +1,7 @@
 "use strict";
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
-let xmlBuilder = require("node-salesforce-connection/xmlbuilder");
+let xml = require("node-salesforce-connection/xml");
 let {nfcall, login, timeout} = require("./common");
 
 module.exports.deploy = async cliArgs => {
@@ -111,7 +111,7 @@ module.exports.deploy = async cliArgs => {
     }
 
     if (destroy) {
-      let destructiveChangesXml = xmlBuilder("Package", ' xmlns="http://soap.sforce.com/2006/04/metadata"', doc);
+      let destructiveChangesXml = xml.stringify({name: "Package", attributes: ' xmlns="http://soap.sforce.com/2006/04/metadata"', value: doc});
       console.log(destructiveChangesXml);
       zip.file("unpackaged/destructiveChanges.xml", Buffer.from(destructiveChangesXml, "utf8"));
 
@@ -119,7 +119,7 @@ module.exports.deploy = async cliArgs => {
     }
 
     doc.version = apiVersion;
-    let packageXml = xmlBuilder("Package", ' xmlns="http://soap.sforce.com/2006/04/metadata"', doc);
+    let packageXml = xml.stringify({name: "Package", attributes: ' xmlns="http://soap.sforce.com/2006/04/metadata"', value: doc});
     console.log(packageXml);
     zip.file("unpackaged/package.xml", Buffer.from(packageXml, "utf8"));
 
