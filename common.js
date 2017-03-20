@@ -82,11 +82,11 @@ async function loginAs({apiVersion, loginUrl, username, password, robust, verbos
     sfConn._request = function(...args) {
       let doRequest = retries =>
         oldRequest.apply(this, args).catch(err => {
-          if (err && err.networkError && err.networkError.errno == "ETIMEDOUT" && err.networkError.syscall == "connect" && retries > 0) {
+          if (err.errno == "ETIMEDOUT" && err.syscall == "connect" && retries > 0) {
             console.log("(Got connect ETIMEDOUT, retrying)");
             return doRequest(retries - 1);
           }
-          if (err && err.networkError && err.networkError.errno == "ECONNRESET" && err.networkError.syscall == "read" && retries > 0) {
+          if (err.errno == "ECONNRESET" && err.syscall == "read" && retries > 0) {
             console.log("(Got read ECONNRESET, retrying)");
             return doRequest(retries - 1);
           }
