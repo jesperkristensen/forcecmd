@@ -12,7 +12,7 @@ module.exports.deploy = async cliArgs => {
     for (let arg of cliArgs) {
       if (arg == "--destroy") {
         destroy = true;
-      } else if (arg.indexOf("--options=") > -1) {
+      } else if (arg.includes("--options=")) {
         // See http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
         deployOptions = JSON.parse(arg.substring("--options=".length));
       } else if (arg[0] == "-") {
@@ -27,7 +27,7 @@ module.exports.deploy = async cliArgs => {
 
       for (let fileName of fileNames) {
         console.log("- " + fileName);
-        if (fileName.indexOf("src/") != 0) {
+        if (!fileName.startsWith("src/")) {
           throw new Error("Not a source file: " + fileName);
         }
         if (fileName.substr(-1) == "/") {

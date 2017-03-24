@@ -9,8 +9,8 @@ module.exports.retrieve = function(cliArgs) {
     return promise;
   }
 
-  let verbose = cliArgs.indexOf("--verbose") > -1;
-  let netlog = cliArgs.indexOf("--netlog") > -1;
+  let verbose = cliArgs.includes("--verbose");
+  let netlog = cliArgs.includes("--netlog");
   if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
     throw new Error("unknown argument");
   }
@@ -134,7 +134,7 @@ module.exports.retrieve = function(cliArgs) {
       }
       let selectedMetadataObjects = availableMetadataObjects
         .filter(metadataObject => {
-          if (excludeDirs.indexOf(metadataObject.directoryName) > -1) {
+          if (excludeDirs.includes(metadataObject.directoryName)) {
             console.log("(Excluding " + metadataObject.directoryName + ")");
             return false;
           }
@@ -261,7 +261,7 @@ module.exports.retrieve = function(cliArgs) {
       for (let p in zip.files) {
         let file = zip.files[p];
         if (!file.options.dir) {
-          let name = "src/" + (file.name.indexOf("unpackaged/") == 0 ? file.name.substring("unpackaged/".length) : file.name);
+          let name = "src/" + (file.name.startsWith("unpackaged/") ? file.name.substring("unpackaged/".length) : file.name);
           // We use Buffer.from(arraybuffer) since that is supposedly a little more performant than the Buffer constructor used by file.asNodeBuffer(), but the difference is probably tiny.
           let arrBuf = file.asArrayBuffer();
           files.push(writeFile(name, arrBuf.byteLength == 0 ? Buffer.alloc(0) : Buffer.from(arrBuf)));
