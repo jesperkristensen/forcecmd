@@ -12,7 +12,7 @@ module.exports.retrieve = function(cliArgs) {
   let verbose = cliArgs.indexOf("--verbose") > -1;
   let netlog = cliArgs.indexOf("--netlog") > -1;
   if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
-    throw "unknown argument";
+    throw new Error("unknown argument");
   }
 
   let writeFile = async (path, data) => {
@@ -71,7 +71,7 @@ module.exports.retrieve = function(cliArgs) {
             soql = "select " + objectDescribe.fields.map(field => field.name).join(", ") + " from " + object;
           }
           if (typeof soql != "string") {
-            throw "Cannot understand configuration of object: " + object;
+            throw new Error("Cannot understand configuration of object: " + object);
           }
           if (verbose) {
             console.log("- Using " + object + " SOQL: " + soql);
@@ -218,7 +218,9 @@ module.exports.retrieve = function(cliArgs) {
         }
       }
       if (res.success != "true") {
-        throw res;
+        let err = new Error("Retrieve failed");
+        err.result = res;
+        throw err;
       }
       let statusJson = JSON.stringify({
         fileProperties: sfConn.asArray(res.fileProperties)

@@ -13,8 +13,8 @@ async function login(options) {
   let config = JSON.parse(file);
   let excludeDirs = config.excludeDirs || [];
   let objects = config.objects || {};
-  if (config.includeObjects) throw "includeObjects is obsolete";
-  if (config.excludeObjects) throw "excludeObjects is obsolete";
+  if (config.includeObjects) throw new Error("includeObjects is obsolete");
+  if (config.excludeObjects) throw new Error("excludeObjects is obsolete");
   let apiVersion = config.apiVersion;
   let sfConn = await loginAs(Object.assign({robust: true}, config, options));
   return {sfConn, apiVersion, excludeDirs, objects};
@@ -22,15 +22,15 @@ async function login(options) {
 
 // Login using a custom configuration and optionally password from ~/forcepw.json
 async function loginAs({apiVersion, loginUrl, username, password, robust, verbose, netlog}) {
-  if (!apiVersion) throw "Missing apiVersion";
+  if (!apiVersion) throw new Error("Missing apiVersion");
 
-  if (!loginUrl) throw "Missing loginUrl";
+  if (!loginUrl) throw new Error("Missing loginUrl");
   let loginUrlParsed = url.parse(loginUrl);
-  if (loginUrlParsed.protocol != "https:") throw "loginUrl must start with https://";
-  if (loginUrlParsed.port) throw "loginUrl must use the default port";
+  if (loginUrlParsed.protocol != "https:") throw new Error("loginUrl must start with https://");
+  if (loginUrlParsed.port) throw new Error("loginUrl must use the default port");
   let hostname = loginUrlParsed.hostname;
 
-  if (!username) throw "Missing username";
+  if (!username) throw new Error("Missing username");
 
   if (!password && process.env.FORCEPW) {
     if (verbose) {
@@ -52,7 +52,7 @@ async function loginAs({apiVersion, loginUrl, username, password, robust, verbos
     }
     password = JSON.parse(pwfile).passwords[pwKey];
   }
-  if (!password) throw "Missing password";
+  if (!password) throw new Error("Missing password");
 
   let sfConn = new SalesforceConnection();
 

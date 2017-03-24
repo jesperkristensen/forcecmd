@@ -16,7 +16,7 @@ module.exports.deploy = async cliArgs => {
         // See http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
         deployOptions = JSON.parse(arg.substring("--options=".length));
       } else if (arg[0] == "-") {
-        throw "Unknown argument: " + arg;
+        throw new Error("Unknown argument: " + arg);
       } else {
         fileNames.push(arg);
       }
@@ -28,7 +28,7 @@ module.exports.deploy = async cliArgs => {
       for (let fileName of fileNames) {
         console.log("- " + fileName);
         if (fileName.indexOf("src/") != 0) {
-          throw "Not a source file: " + fileName;
+          throw new Error("Not a source file: " + fileName);
         }
         if (fileName.substr(-1) == "/") {
           readFiles.push(fileName.substring(0, fileName.length - 1) + "-meta.xml");
@@ -76,7 +76,7 @@ module.exports.deploy = async cliArgs => {
       if (fileName.substr(-1) == "/") { // It is a "Folder". It does not have a main metadata file, only the -meta.xml file.
         let folderMetaName = fileName.substring(0, fileName.length - 1) + "-meta.xml";
         if (!destroy && files[folderMetaName] == null) {
-          throw "File not found: " + fileName;
+          throw new Error("File not found: " + fileName);
         }
         zipFileName = "unpackaged/" + folderMetaName.substring("src/".length);
         if (!destroy) {
@@ -86,7 +86,7 @@ module.exports.deploy = async cliArgs => {
         fullName = zipFileName.substring(zipFileName.indexOf("/", "unpackaged/".length) + 1, zipFileName.length - "-meta.xml".length);
       } else {
         if (!destroy && files[fileName] == null) {
-          throw "File not found: " + fileName;
+          throw new Error("File not found: " + fileName);
         }
         zipFileName = "unpackaged/" + fileName.substring("src/".length);
         if (!destroy) {
@@ -101,7 +101,7 @@ module.exports.deploy = async cliArgs => {
       let typeDirName = zipFileName.substring("unpackaged/".length, zipFileName.indexOf("/", "unpackaged/".length));
 
       if (!(typeDirName in metadataObjectsByDir)) {
-        throw "Metadata not found for file: " + fileName;
+        throw new Error("Metadata not found for file: " + fileName);
       }
 
       doc.types.push({
@@ -149,7 +149,13 @@ module.exports.deploy = async cliArgs => {
         break;
       }
     }
-    console.log({status: res.status, errors: sfConn.asArray(res.details.componentFailures)});
+    let output = {status: res.status, errors: sfConn.asArray(res.details.componentFailures)};
+    if (res.success != "true") {
+      let err = new Error("Deploy failed");
+      Object.assign(err, output);
+      throw err;
+    }
+    console.log(output);
   } catch (err) {
     process.exitCode = 1;
     console.error(err);
