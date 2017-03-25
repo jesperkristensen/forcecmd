@@ -1,7 +1,8 @@
 "use strict";
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
-let {nfcall, login, timeout} = require("./common");
+let {forcecmdLogin} = require("./common");
+let {nfcall, timeout} = require("./promise-utils");
 
 module.exports.retrieve = function(cliArgs) {
   function logWait(msg, promise) {
@@ -10,8 +11,7 @@ module.exports.retrieve = function(cliArgs) {
   }
 
   let verbose = cliArgs.includes("--verbose");
-  let netlog = cliArgs.includes("--netlog");
-  if (cliArgs.some(a => a != "--verbose" && a != "--netlog")) {
+  if (cliArgs.some(a => a != "--verbose")) {
     throw new Error("unknown argument");
   }
 
@@ -32,11 +32,14 @@ module.exports.retrieve = function(cliArgs) {
     await nfcall(fs.writeFile, path, data);
   };
 
-  let loginPromise = login({verbose, netlog});
+  let loginPromise = forcecmdLogin({verbose});
 
   (async () => {
     try {
-      let {sfConn, apiVersion, objects} = await loginPromise;
+      let {sfConn, config} = await loginPromise;
+      if (config.includeObjects) throw new Error("includeObjects is obsolete");
+      if (config.excludeObjects) throw new Error("excludeObjects is obsolete");
+      let {apiVersion, objects = {}} = config;
       let describe = await logWait(
         "DescribeGlobal",
         sfConn.rest("/services/data/v" + apiVersion + "/sobjects")
@@ -100,7 +103,7 @@ module.exports.retrieve = function(cliArgs) {
       await Promise.all(results);
     } catch (e) {
       process.exitCode = 1;
-      console.error(e);
+      console.error(e.message);
     }
   })();
 
@@ -121,7 +124,7 @@ module.exports.retrieve = function(cliArgs) {
     }
 
     try {
-      let {sfConn, apiVersion, excludeDirs} = await loginPromise;
+      let {sfConn, config: {apiVersion, excludeDirs = []}} = await loginPromise;
       let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
       let res = await logWait(
         "DescribeMetadata",
@@ -271,7 +274,7 @@ module.exports.retrieve = function(cliArgs) {
       await Promise.all(files);
     } catch (e) {
       process.exitCode = 1;
-      console.error(e);
+      console.error(e.message);
     }
   })();
 };

@@ -2,7 +2,8 @@
 let fs = require("graceful-fs");
 let JSZip = require("jszip");
 let xml = require("node-salesforce-connection/xml");
-let {nfcall, login, timeout} = require("./common");
+let {forcecmdLogin} = require("./common");
+let {nfcall, timeout} = require("./promise-utils");
 
 module.exports.deploy = async cliArgs => {
   try {
@@ -57,7 +58,7 @@ module.exports.deploy = async cliArgs => {
     };
 
     let filesPromise = destroy ? null : readAllFiles();
-    let {sfConn, apiVersion} = await login({verbose: false});
+    let {sfConn, config: {apiVersion}} = await forcecmdLogin({verbose: false});
     let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
     console.log("Describe");
     let describeResult = await sfConn.soap(metadataApi, "describeMetadata", {apiVersion});
@@ -158,6 +159,6 @@ module.exports.deploy = async cliArgs => {
     console.log(output);
   } catch (err) {
     process.exitCode = 1;
-    console.error(err);
+    console.error(err.message);
   }
 };
