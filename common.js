@@ -5,6 +5,9 @@ let {nfcall} = require("./promise-utils");
 
 // Login using the configuration from ./forcecmd.json and password from ~/forcepw.json
 async function forcecmdLogin(options) {
+  if (options.verbose) {
+    console.log("- Running from directory: " + __dirname);
+  }
   let config = JSON.parse(await nfcall(fs.readFile, "forcecmd.json", "utf-8"));
   let sfConn = await salesforceLogin(Object.assign({robust: true}, config, options));
   return {sfConn, config};
