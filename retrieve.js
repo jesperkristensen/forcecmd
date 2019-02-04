@@ -32,6 +32,23 @@ module.exports.retrieve = function(cliArgs) {
     await nfcall(fs.writeFile, path, data);
   };
 
+  let fsRemove = async path => {
+    try {
+      await nfcall(fs.unlink, path);
+    } catch (ex) {
+      if (ex.code == "ENOENT") {
+        // File does not exist
+        return;
+      }
+      if (ex.code == "EPERM") {
+        // Was not a file. Assume it was a directory
+        let files = await nfcall(fs.readdir, path);
+        await Promise.all(files.map(file => fsRemove(path + "/" + file)));
+        await nfcall(fs.rmdir, path);
+      }
+    }
+  };
+
   let loginPromise = forcecmdLogin({verbose});
 
   (async () => {
@@ -55,6 +72,8 @@ module.exports.retrieve = function(cliArgs) {
           objects[sobject.name] = true;
         }
       }
+
+      await fsRemove("data");
 
       let results = [];
       for (let object in objects) {
@@ -232,22 +251,6 @@ module.exports.retrieve = function(cliArgs) {
         messages: res.messages
       }, null, "    ");
       console.log("(Reading response and writing files)");
-      let fsRemove = async path => {
-        try {
-          await nfcall(fs.unlink, path);
-        } catch (ex) {
-          if (ex.code == "ENOENT") {
-            // File does not exist
-            return;
-          }
-          if (ex.code == "EPERM") {
-            // Was not a file. Assume it was a directory
-            let files = await nfcall(fs.readdir, path);
-            await Promise.all(files.map(file => fsRemove(path + "/" + file)));
-            await nfcall(fs.rmdir, path);
-          }
-        }
-      };
       await fsRemove("src");
       // We wait until the old files are removed before we create the new
       let files = [];
