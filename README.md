@@ -11,8 +11,8 @@ and work around some bugs and limitations in the metadata API.
 ## Installation
 
 1. Install Node.js from http://nodejs.org/.
-2. Open a command prompt. (Tested in MinGW)
-3. Run `npm install --global jesperkristensen/forcecmd`.
+2. Open a command prompt / terminal.
+3. Run `npm install --global forcecmd`.
 
 ## Set up an org
 
@@ -20,7 +20,7 @@ and work around some bugs and limitations in the metadata API.
 2. Create a new file in your org's directory named `forcecmd.json` with content like this:
 
         {
-          "apiVersion": "38.0",
+          "apiVersion": "45.0",
           "hostname": "login.salesforce.com",
           "username": "yourname@yourcompany.com"
         }
@@ -35,13 +35,13 @@ and work around some bugs and limitations in the metadata API.
 
 ## Download an org
 
-1. Navigate your command prompt to our org's directory.
+1. Navigate your command prompt to your org's directory.
 2. Type `forcecmd retrieve`.
 
 All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
 
     {
-      "apiVersion": "38.0",
+      "apiVersion": "45.0",
       "hostname": "login.salesforce.com",
       "username": "yourname@yourcompany.com",
       "excludeDirs": ["documents"],
