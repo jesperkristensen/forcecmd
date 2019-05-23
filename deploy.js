@@ -150,7 +150,11 @@ module.exports.deploy = async cliArgs => {
         break;
       }
     }
-    let output = {status: res.status, errors: sfConn.asArray(res.details.componentFailures)};
+    let output = {
+      status: res.status,
+      errors: sfConn.asArray(res.details.componentFailures),
+      testErrors: sfConn.asArray(res.details.runTestResult.failures)
+    };
     if (res.success != "true") {
       console.error(output);
       let err = new Error("Deploy failed");
