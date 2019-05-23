@@ -20,7 +20,6 @@ and work around some bugs and limitations in the metadata API.
 2. Create a new file in your org's directory named `forcecmd.json` with content like this:
 
         {
-          "apiVersion": "45.0",
           "hostname": "login.salesforce.com",
           "username": "yourname@yourcompany.com"
         }

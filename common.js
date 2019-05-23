@@ -10,12 +10,19 @@ async function forcecmdLogin(options) {
   }
   let config = JSON.parse(await nfcall(fs.readFile, "forcecmd.json", "utf-8"));
   let sfConn = await salesforceLogin(Object.assign({robust: true}, config, options));
+  if (!config.apiVersion) {
+    console.log("API-Versions");
+    let apis = await sfConn.rest("/services/data");
+    let latestApi = apis.pop();
+    console.log({label: latestApi.label, version: latestApi.version});
+    config.apiVersion = latestApi.version;
+  }
   return {sfConn, config};
 }
 
 // Login using a custom configuration and optionally password from ~/forcepw.json
 async function salesforceLogin({apiVersion, hostname, username, password, robust, verbose}) {
-  if (!apiVersion) throw new Error("Missing apiVersion");
+  if (!apiVersion) apiVersion = "45.0";
   if (!hostname) throw new Error("Missing hostname");
   if (!username) throw new Error("Missing username");
 
