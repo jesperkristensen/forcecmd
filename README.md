@@ -64,6 +64,7 @@ Upon completion the tool will typically print a number of messages from the Meta
 Additional arguments:
 * `--destroy`: Delete all the listed files instead of updating them.
 * `'--options={"rollbackOnError":true}'`: Specify deployment options as documented on http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
+* `--save-test-result`: Save test results (if tests are run) to a file named `TEST-result.xml` in JUnit format.
 
 ## Use with continous integration
 

@@ -10,12 +10,15 @@ module.exports.deploy = async cliArgs => {
     let fileNames = [];
     let destroy = false;
     let deployOptions = {};
+    let saveTestResult = false;
     for (let arg of cliArgs) {
       if (arg == "--destroy") {
         destroy = true;
       } else if (arg.includes("--options=")) {
         // See http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
         deployOptions = JSON.parse(arg.substring("--options=".length));
+      } else if (arg == "--save-test-result") {
+        saveTestResult = true;
       } else if (arg[0] == "-") {
         throw new Error("Unknown argument: " + arg);
       } else {
@@ -149,6 +152,66 @@ module.exports.deploy = async cliArgs => {
       if (res.done !== "false") {
         break;
       }
+    }
+    if (saveTestResult) {
+      console.log("(Writing test result to TEST-result.xml)");
+      const toLocalTimeZone = date => date.getFullYear().toString()
+        + '-' + (date.getMonth() + 1).toString().padStart(2, "0")
+        + '-' + date.getDate().toString().padStart(2, "0")
+        + 'T' + date.getHours().toString().padStart(2, "0")
+        + ':' + date.getMinutes().toString().padStart(2, "0")
+        + ':' + date.getSeconds().toString().padStart(2, "0");
+      let testResultXml = `
+<testsuites>
+  ${sfConn.asArray(res.details).map(deployDetails => deployDetails.runTestResult).filter(runTestsResult => runTestsResult).map((runTestsResult, index) => `
+  <testsuite
+    package="details"
+    id="${xml.encode(index)}"
+    name="runTestResult"
+    timestamp="${xml.encode(toLocalTimeZone(new Date(res.startDate)))}"
+    hostname="${xml.encode(sfConn.instanceHostname)}"
+    tests="${xml.encode(runTestsResult.numTestsRun)}"
+    failures="${xml.encode(runTestsResult.numFailures)}"
+    errors="0"
+    time="${xml.encode(runTestsResult.totalTime)}">
+    <properties>
+      <property name="apexLogId" value="${xml.encode(runTestsResult.apexLogId || "")}"/>
+    </properties>
+    ${sfConn.asArray(runTestsResult.codeCoverageWarnings).map(codeCoverageWarning => `
+    <testcase
+      name="CodeCoverageWarning"
+      classname="${xml.encode((codeCoverageWarning.namespace ? codeCoverageWarning.namespace + "." : "") + "CodeCoverageWarning")}"
+      time="0">
+      <failure message="${xml.encode(codeCoverageWarning.message)}" type="CodeCoverageWarning"/>
+    </testcase>
+    `).join("")}
+    ${sfConn.asArray(runTestsResult.failures).map(runTestFailure => `
+    <testcase
+      name="${xml.encode(runTestFailure.methodName)}"
+      classname="${xml.encode((runTestFailure.namespace ? runTestFailure.namespace + "." : "") + runTestFailure.name)}"
+      time="${xml.encode(runTestFailure.time)}">
+      <failure message="${xml.encode(runTestFailure.message)}" type="RunTestFailure">${xml.encode(runTestFailure.stackTrace)}</failure>
+    </testcase>
+    `).join("")}
+    ${sfConn.asArray(runTestsResult.flowCoverageWarnings).map(flowCoverageWarning => `
+    <testcase
+      name="${xml.encode(flowCoverageWarning.flowName)}"
+      classname="${xml.encode((flowCoverageWarning.flowNamespace ? flowCoverageWarning.flowNamespace + "." : "") + flowCoverageWarning.flowName)}"
+      time="0">
+      <failure message="${xml.encode(flowCoverageWarning.message)}" type="FlowCoverageWarning"/>
+    </testcase>
+    `).join("")}
+    ${sfConn.asArray(runTestsResult.successes).map(runTestSuccess => `
+    <testcase
+      name="${xml.encode(runTestSuccess.methodName)}"
+      classname="${xml.encode((runTestSuccess.namespace ? runTestSuccess.namespace + "." : "") + runTestSuccess.name)}"
+      time="${xml.encode(runTestSuccess.time)}"/>
+    `).join("")}
+  </testsuite>
+  `)}
+</testsuites>
+`;
+      await nfcall(fs.writeFile, "TEST-result.xml", testResultXml);
     }
     let output = {
       status: res.status,
