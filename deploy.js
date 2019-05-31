@@ -156,11 +156,11 @@ module.exports.deploy = async cliArgs => {
     if (saveTestResult) {
       console.log("(Writing test result to TEST-result.xml)");
       const toLocalTimeZone = date => date.getFullYear().toString()
-        + '-' + (date.getMonth() + 1).toString().padStart(2, "0")
-        + '-' + date.getDate().toString().padStart(2, "0")
-        + 'T' + date.getHours().toString().padStart(2, "0")
-        + ':' + date.getMinutes().toString().padStart(2, "0")
-        + ':' + date.getSeconds().toString().padStart(2, "0");
+        + "-" + (date.getMonth() + 1).toString().padStart(2, "0")
+        + "-" + date.getDate().toString().padStart(2, "0")
+        + "T" + date.getHours().toString().padStart(2, "0")
+        + ":" + date.getMinutes().toString().padStart(2, "0")
+        + ":" + date.getSeconds().toString().padStart(2, "0");
       let testResultXml = `
 <testsuites>
   ${sfConn.asArray(res.details).map(deployDetails => deployDetails.runTestResult).filter(runTestsResult => runTestsResult).map((runTestsResult, index) => `
