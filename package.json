@@ -1,6 +1,6 @@
 {
   "name": "forcecmd",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A command-line tool for the Salesforce metadata API",
   "license": "MIT",
   "repository": "jesperkristensen/forcecmd",
