@@ -173,7 +173,7 @@ module.exports.deploy = async cliArgs => {
     tests="${xml.encode(runTestsResult.numTestsRun)}"
     failures="${xml.encode(runTestsResult.numFailures)}"
     errors="0"
-    time="${xml.encode(Number(runTestsResult.totalTime)/1000)}">
+    time="${xml.encode(Number(runTestsResult.totalTime) / 1000)}">
     <properties>
       <property name="apexLogId" value="${xml.encode(runTestsResult.apexLogId || "")}"/>
     </properties>
@@ -189,7 +189,7 @@ module.exports.deploy = async cliArgs => {
     <testcase
       name="${xml.encode(runTestFailure.methodName)}"
       classname="${xml.encode((runTestFailure.namespace ? runTestFailure.namespace + "." : "") + runTestFailure.name)}"
-      time="${xml.encode(Number(runTestFailure.time)/1000)}">
+      time="${xml.encode(Number(runTestFailure.time) / 1000)}">
       <failure message="${xml.encode(runTestFailure.message)}" type="RunTestFailure">${xml.encode(runTestFailure.stackTrace)}</failure>
     </testcase>
     `).join("")}
@@ -205,7 +205,7 @@ module.exports.deploy = async cliArgs => {
     <testcase
       name="${xml.encode(runTestSuccess.methodName)}"
       classname="${xml.encode((runTestSuccess.namespace ? runTestSuccess.namespace + "." : "") + runTestSuccess.name)}"
-      time="${xml.encode(Number(runTestSuccess.time)/1000)}"/>
+      time="${xml.encode(Number(runTestSuccess.time) / 1000)}"/>
     `).join("")}
   </testsuite>
   `)}
