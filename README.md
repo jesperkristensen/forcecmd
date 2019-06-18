@@ -65,6 +65,7 @@ Additional arguments:
 * `--destroy`: Delete all the listed files instead of updating them.
 * `'--options={"rollbackOnError":true}'`: Specify deployment options as documented on http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
 * `--save-test-result`: Save test results (if tests are run) to a file named `TEST-result.xml` in JUnit format.
+* `--ignore-deploy-errors`: By default the process exits with an error code when the deployment fails. Use this argument to always exit with success no matter if the deployment was successful or not.
 
 ## Use with continous integration
 

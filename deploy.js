@@ -11,14 +11,17 @@ module.exports.deploy = async cliArgs => {
     let destroy = false;
     let deployOptions = {};
     let saveTestResult = false;
+    let ignoreDeployErrors = false;
     for (let arg of cliArgs) {
       if (arg == "--destroy") {
         destroy = true;
-      } else if (arg.includes("--options=")) {
+      } else if (arg.startsWith("--options=")) {
         // See http://www.salesforce.com/us/developer/docs/api_meta/Content/meta_deploy.htm#deploy_options
         deployOptions = JSON.parse(arg.substring("--options=".length));
       } else if (arg == "--save-test-result") {
         saveTestResult = true;
+      } else if (arg == "--ignore-deploy-errors") {
+        ignoreDeployErrors = true;
       } else if (arg[0] == "-") {
         throw new Error("Unknown argument: " + arg);
       } else {
@@ -179,8 +182,8 @@ module.exports.deploy = async cliArgs => {
     </properties>
     ${sfConn.asArray(runTestsResult.codeCoverageWarnings).map(codeCoverageWarning => `
     <testcase
-      name="CodeCoverageWarning"
-      classname="${xml.encode((codeCoverageWarning.namespace ? codeCoverageWarning.namespace + "." : "") + "CodeCoverageWarning")}"
+      name="${xml.encode(codeCoverageWarning.name || "CodeCoverageWarning")}"
+      classname="${xml.encode((codeCoverageWarning.namespace ? codeCoverageWarning.namespace + "." : "") + (codeCoverageWarning.name || "CodeCoverageWarning"))}"
       time="0">
       <failure message="${xml.encode(codeCoverageWarning.message)}" type="CodeCoverageWarning"/>
     </testcase>
@@ -218,7 +221,7 @@ module.exports.deploy = async cliArgs => {
       errors: sfConn.asArray(res.details.componentFailures),
       testErrors: sfConn.asArray(res.details.runTestResult.failures)
     };
-    if (res.success != "true") {
+    if (res.success != "true" && !ignoreDeployErrors) {
       console.error(output);
       let err = new Error("Deploy failed");
       Object.assign(err, output);
