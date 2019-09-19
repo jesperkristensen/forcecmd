@@ -4,6 +4,7 @@ let JSZip = require("jszip");
 let xml = require("node-salesforce-connection/xml");
 let {forcecmdLogin} = require("./common");
 let {nfcall, timeout} = require("./promise-utils");
+let {setTimed} = require("./timer");
 
 module.exports.deploy = async cliArgs => {
   try {
@@ -22,6 +23,8 @@ module.exports.deploy = async cliArgs => {
         saveTestResult = true;
       } else if (arg == "--ignore-deploy-errors") {
         ignoreDeployErrors = true;
+      } else if (arg == "--timed") {
+        setTimed();
       } else if (arg[0] == "-") {
         throw new Error("Unknown argument: " + arg);
       } else {

@@ -3,6 +3,7 @@ let fs = require("graceful-fs");
 let JSZip = require("jszip");
 let {forcecmdLogin} = require("./common");
 let {nfcall, timeout} = require("./promise-utils");
+let {setTimed} = require("./timer");
 
 module.exports.retrieve = function(cliArgs) {
   function logWait(msg, promise) {
@@ -10,9 +11,15 @@ module.exports.retrieve = function(cliArgs) {
     return promise;
   }
 
-  let verbose = cliArgs.includes("--verbose");
-  if (cliArgs.some(a => a != "--verbose")) {
-    throw new Error("unknown argument");
+  let verbose = false;
+  for (let arg of cliArgs) {
+    if (arg == "--verbose") {
+      verbose = true;
+    } else if (arg == "--timed") {
+      setTimed();
+    } else {
+      throw new Error("unknown argument");
+    }
   }
 
   let writeFile = async (path, data) => {
