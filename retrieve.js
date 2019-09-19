@@ -8,7 +8,10 @@ let {setTimed} = require("./timer");
 module.exports.retrieve = function(cliArgs) {
   function logWait(msg, promise) {
     console.log(msg);
-    return promise;
+    return promise.catch(err => {
+      console.error("Error in", msg);
+      throw err;
+    });
   }
 
   let verbose = false;
@@ -149,6 +152,7 @@ module.exports.retrieve = function(cliArgs) {
       return groups;
     }
 
+    let hintExcludeDirs = false;
     try {
       let {sfConn, config: {apiVersion, excludeDirs = []}} = await loginPromise;
       let metadataApi = sfConn.wsdl(apiVersion, "Metadata");
@@ -163,7 +167,8 @@ module.exports.retrieve = function(cliArgs) {
       }
       let selectedMetadataObjects = availableMetadataObjects
         .filter(metadataObject => {
-          if (excludeDirs.includes(metadataObject.directoryName)) {
+          let names = sfConn.asArray(metadataObject.childXmlNames).concat(metadataObject.xmlName).concat(metadataObject.directoryName);
+          if (names.some(name => excludeDirs.includes(name))) {
             console.log("(Excluding " + metadataObject.directoryName + ")");
             return false;
           }
@@ -186,6 +191,7 @@ module.exports.retrieve = function(cliArgs) {
             return xmlName;
           });
         });
+      hintExcludeDirs = true;
       res = await Promise.all(groupByThree(flattenArray(x)).map(async xmlNames => {
         let someItems = sfConn.asArray(await logWait(
           "ListMetadata " + xmlNames.join(", "),
@@ -285,6 +291,9 @@ module.exports.retrieve = function(cliArgs) {
     } catch (e) {
       process.exitCode = 1;
       console.error(e.message);
+      if (hintExcludeDirs) {
+        console.log("(Hint: If a specific piece of metadata is causing the problem, try adding it to the \"excludeDirs\" confiuration.)");
+      }
     }
   })();
 };
