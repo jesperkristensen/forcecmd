@@ -291,6 +291,9 @@ module.exports.retrieve = function(cliArgs) {
     } catch (e) {
       process.exitCode = 1;
       console.error(e.message);
+      if (e.result) {
+        console.error(e.result);
+      }
       if (hintExcludeDirs) {
         console.log("(Hint: If a specific piece of metadata is causing the problem, try adding it to the \"excludeDirs\" confiuration.)");
       }
