@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "graceful-fs": "*",
-    "jszip": "2.2.x",
+    "jszip": "2.7.x",
     "node-salesforce-connection": "2.3.1"
   },
   "devDependencies": {
