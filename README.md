@@ -72,7 +72,7 @@ Additional arguments:
 
 You can use forcecmd together with a continuous integration tool and a version control system to backup and track changes to all your Salesforce organization's customizations (metadata), and to continously run all your Salesforce organization's unit tests.
 
-See an [example of how to set this up completely in the cloud using GitHub and Travis CI](https://github.com/jesperkristensen/forcecmd-demo).
+See an [example of how to set this up completely in the cloud using GitHub](https://github.com/jesperkristensen/forcecmd-demo).
 
 See an [example of how to set this up completely in the cloud using Azure DevOps](https://dev.azure.com/forcecmd/_git/forcecmd-demo).
 
