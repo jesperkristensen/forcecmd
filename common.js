@@ -3,7 +3,7 @@ let fs = require("graceful-fs");
 let SalesforceConnection = require("node-salesforce-connection");
 let {nfcall} = require("./promise-utils");
 
-// Login using the configuration from ./forcecmd.json and password from ~/forcepw.json
+// Login using the configuration from ./forcecmd.json and client_secret from ~/forcepw.json
 async function forcecmdLogin(options) {
   if (options.verbose) {
     console.log("- Running from directory: " + __dirname);
@@ -20,32 +20,31 @@ async function forcecmdLogin(options) {
   return {sfConn, config};
 }
 
-// Login using a custom configuration and optionally password from ~/forcepw.json
-async function salesforceLogin({apiVersion, hostname, username, password, robust, verbose}) {
-  if (!apiVersion) apiVersion = "45.0";
+// Login using a custom configuration and optionally client_secret from ~/forcepw.json
+async function salesforceLogin({hostname, client_id, client_secret, robust, verbose}) {
   if (!hostname) throw new Error("Missing hostname");
-  if (!username) throw new Error("Missing username");
+  if (!client_id) throw new Error("Missing client_id");
 
-  if (!password && process.env.FORCEPW) {
+  if (!client_secret && process.env.SF_CLIENT_SECRET) {
     if (verbose) {
-      console.log("- Using password from FORCEPW environment variable");
+      console.log("- Using client_secret from SF_CLIENT_SECRET environment variable");
     }
-    password = process.env.FORCEPW;
+    client_secret = process.env.SF_CLIENT_SECRET;
   }
 
-  if (!password) {
+  if (!client_secret) {
     let pwfileName = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + "/forcepw.json";
     if (verbose) {
-      console.log("- Looking for password in file: " + pwfileName);
+      console.log("- Looking for client_secret in file: " + pwfileName);
     }
     let pwfile = JSON.parse(await nfcall(fs.readFile, pwfileName, "utf-8"));
-    let pwKey = hostname + ":" + username;
+    let pwKey = hostname + ":" + client_id;
     if (verbose) {
-      console.log("- Looking for password with key: " + pwKey);
+      console.log("- Looking for client_secret with key: " + pwKey);
     }
-    password = pwfile.passwords[pwKey];
+    client_secret = pwfile.client_secrets[pwKey];
   }
-  if (!password) throw new Error("Missing password");
+  if (!client_secret) throw new Error("Missing client_secret");
 
   let sfConn = new SalesforceConnection();
 
@@ -70,8 +69,8 @@ async function salesforceLogin({apiVersion, hostname, username, password, robust
   }
   /* eslint-enable no-underscore-dangle */
 
-  console.log("Login " + hostname + " " + username + " " + apiVersion);
-  await sfConn.soapLogin({hostname, apiVersion, username, password});
+  console.log("Login " + hostname + " " + client_id);
+  await sfConn.oauthToken(hostname, {grant_type: "client_credentials", client_id, client_secret});
   return sfConn;
 }
 

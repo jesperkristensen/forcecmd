@@ -16,19 +16,24 @@ and work around some bugs and limitations in the metadata API.
 
 ## Set up an org
 
+1. In Salesforce Setup, create an External client app.
+   - Enable the OAuth Client Credentials Flow.
+   - Enable the api scope.
+   - Select a Run As username.
+   - Copy the Consumer Key and Secret.
 1. Create an empty directory for your org.
 2. Create a new file in your org's directory named `forcecmd.json` with content like this:
 
         {
-          "hostname": "login.salesforce.com",
-          "username": "yourname@yourcompany.com"
+          "hostname": "your-domain.my.salesforce.com",
+          "client_id": "your-external-client-app-consumer-key",
         }
 
 3. Create a new file in your home directory (`~`) named `forcepw.json` with content like this:
 
         {
-          "passwords": {
-            "login.salesforce.com:yourname@yourcompany.com": "YourPasswordYourSecirityToken"
+          "client_secrets": {
+            "your-domain.my.salesforce.com:your-external-client-app-consumer-key": "your-external-client-app-consumer-secret"
           }
         }
 
@@ -40,9 +45,9 @@ and work around some bugs and limitations in the metadata API.
 All metadata and all custom settings are downloaded by default. You can customize this in `forcecmd.json` like this:
 
     {
-      "apiVersion": "45.0",
-      "hostname": "login.salesforce.com",
-      "username": "yourname@yourcompany.com",
+      "apiVersion": "68.0",
+      "hostname": "your-domain.my.salesforce.com",
+      "client_id": "your-external-client-app-consumer-key",
       "excludeDirs": ["documents"],
       "objects": {
         "MyCustomSetting__c": false,
@@ -52,7 +57,7 @@ All metadata and all custom settings are downloaded by default. You can customiz
       }
     }
 
-Use `forcecmd retrieve --verbose` to see what values are available to customize, or to debug issues finding the right password.
+Use `forcecmd retrieve --verbose` to see what values are available to customize, or to debug issues finding the right client_secret.
 
 Upon completion the tool will typically print a number of messages from the Metadata API indicating problems. This is normal. If the status is Succeeded, you can ignore the messages.
 
